@@ -6,6 +6,7 @@ import '../services/settings_service.dart';
 import '../widgets/route_animation.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
+import 'mfa_screen.dart';
 import 'otp_screen.dart';
 import 'signup_screen.dart';
 
@@ -66,7 +67,56 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await OnboarderSession.instance.signIn(email, password);
+      final result = await OnboarderSession.instance.signIn(email, password);
+      if (!mounted) return;
+      if (OnboarderSession.instance.pendingMfa != null) {
+        setState(() {
+          _loading = false;
+          _error = null;
+        });
+        final nav = Navigator.of(context);
+        nav.push(
+          MaterialPageRoute<void>(
+            builder: (_) => MfaScreen(
+              email: email,
+              onVerified: () {
+                nav.pushAndRemoveUntil(
+                  MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
+                  (route) => false,
+                );
+              },
+            ),
+          ),
+        );
+        return;
+      }
+if (result) {
+      // Check if the vendor is active; if disabled, show a blocked screen
+      final isVendor = OnboarderSession.instance.user?.role == 'vendor';
+      if (isVendor) {
+        final api = ApiClient();
+        try {
+          final data = await api.get('/api/v1/vendor/me',
+              headers: {'Authorization': 'Bearer ${OnboarderSession.instance.accessToken}'});
+          if (data['is_active'] == false) {
+            // Vendor is disabled — show a blocked state instead of home
+            setState(() => _loading = false);
+            _error = 'Your vendor account has been disabled. Contact the administrator.';
+            return;
+          }
+        } catch (_) {
+          // If the check fails, proceed home (best-effort)
+        }
+      }
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
+      );
+      return;
+    }
+      setState(() {
+        _loading = false;
+        _error = 'Invalid credentials or login failed.';
+      });
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
@@ -76,17 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
       return;
     }
-
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
-    );
   }
 
-  void _useDemo(String email) {
-    _emailController.text = email;
-    _passwordController.text = 'Onboard@123';
-  }
+
 
   /// Opens the phone/OTP sign-in flow. The OTP screen verifies the code with
   /// the backend and enters the authenticated session before navigating on.
@@ -107,14 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Bypasses the server entirely and enters an authenticated demo session.
-  void _signInTest() {
-    FocusScope.of(context).unfocus();
-    OnboarderSession.instance.enterDemo();
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -179,9 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           error: _error,
                           loading: _loading,
                           onSignIn: _signIn,
-                          onTestMode: _signInTest,
                           onOpenOtp: _openOtp,
-                          onUseDemo: _useDemo,
                           appName: _settings?.appName ?? 'MarketGO',
                         ),
                         const SizedBox(height: 18),
@@ -318,9 +351,7 @@ class _LoginCard extends StatelessWidget {
     required this.error,
     required this.loading,
     required this.onSignIn,
-    required this.onTestMode,
     required this.onOpenOtp,
-    required this.onUseDemo,
     required this.appName,
   });
 
@@ -333,9 +364,7 @@ class _LoginCard extends StatelessWidget {
   final String? error;
   final bool loading;
   final VoidCallback onSignIn;
-  final VoidCallback onTestMode;
   final VoidCallback onOpenOtp;
-  final ValueChanged<String> onUseDemo;
   final String appName;
 
   @override
@@ -370,74 +399,6 @@ class _LoginCard extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: OnboarderApp.brandTealLight,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: OnboarderApp.brandTeal.withOpacity(0.35),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.flash_on_rounded,
-                  color: OnboarderApp.brandTealDark),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'No server? Explore the full app now',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                        color: OnboarderApp.brandTealDark,
-                      ),
-                    ),
-                    Text(
-                      'Skips sign-in entirely for testing.',
-                      style: TextStyle(
-                        color: OnboarderApp.brandTealDark,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: onTestMode,
-                style: TextButton.styleFrom(
-                  foregroundColor: OnboarderApp.brandTealDark,
-                ),
-                child: const Text('Test mode'),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Text('Demo onboarder', style: theme.textTheme.bodySmall),
-            const Spacer(),
-            ActionChip(
-              avatar: Icon(Icons.bolt,
-                  size: 16, color: OnboarderApp.brandTeal),
-              label: const Text('Use demo'),
-              backgroundColor: OnboarderApp.brandTealLight,
-              side: BorderSide.none,
-              labelStyle: TextStyle(
-                color: OnboarderApp.brandTealDark,
-                fontWeight: FontWeight.w700,
-              ),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              onPressed: () => onUseDemo('onboarder@marketgo.com'),
-            ),
-          ],
-        ),
         const SizedBox(height: 16),
 
         TextField(
