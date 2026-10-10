@@ -25,10 +25,10 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
 
   Future<void> _loadProfile() async {
     final token = OnboarderSession.instance.accessToken;
-    if (token == null || token == 'demo.access') {
+    if (token == null) {
       setState(() {
         _loading = false;
-        _profile = null;
+        _error = 'Sign in to view KYC status.';
       });
       return;
     }

@@ -42,6 +42,7 @@ class _OnboardRiderScreenState extends State<OnboardRiderScreen> {
   ];
 
   bool _submitting = false;
+
   String? _error;
 
   @override
@@ -52,12 +53,12 @@ class _OnboardRiderScreenState extends State<OnboardRiderScreen> {
 
   Future<void> _loadVehicleTypes() async {
     final token = OnboarderSession.instance.accessToken;
-    if (token == null || token == 'demo.access') {
+    if (token == null) {
       setState(() {
         _vehicleTypes = [
           {'id': 1, 'name': 'bike', 'label': 'Bike'},
-          {'id': 2, 'name': 'sedan', 'label': 'Sedan'},
-          {'id': 3, 'name': 'lorry', 'label': 'Lorry'},
+          {'id': 2, 'name': 'car', 'label': 'Car'},
+          {'id': 3, 'name': 'keke', 'label': 'Keke'},
         ];
       });
       return;
@@ -150,7 +151,7 @@ class _OnboardRiderScreenState extends State<OnboardRiderScreen> {
     });
 
     final token = OnboarderSession.instance.accessToken;
-    if (token == null || token == 'demo.access') {
+    if (token == null) {
       setState(() {
         _submitting = false;
         _error = 'Please sign in with a real account to onboard riders.';

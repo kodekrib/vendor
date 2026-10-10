@@ -72,7 +72,7 @@ class _OnboardVendorScreenState extends State<OnboardVendorScreen> {
     });
 
     final token = OnboarderSession.instance.accessToken;
-    if (token == null || token == 'demo.access') {
+    if (token == null) {
       setState(() {
         _submitting = false;
         _error = 'Please sign in with a real account to onboard vendors.';

@@ -44,6 +44,43 @@ class TokenPair {
   }
 }
 
+class MfaChallenge {
+  const MfaChallenge({
+    required this.mfaToken,
+    required this.expiresIn,
+    required this.channels,
+    this.devCode,
+  });
+
+  final String mfaToken;
+  final int expiresIn;
+  final List<String> channels;
+  final String? devCode;
+
+  factory MfaChallenge.fromJson(Map<String, dynamic> json) {
+    return MfaChallenge(
+      mfaToken: json['mfa_token'] as String? ?? '',
+      expiresIn: (json['expires_in'] as num?)?.toInt() ?? 0,
+      channels: (json['channels'] as List?)?.map((e) => '$e').toList() ??
+          const <String>[],
+      devCode: json['dev_code'] as String?,
+    );
+  }
+}
+
+class LoginResult {
+  const LoginResult._({this.tokens, this.mfa});
+
+  factory LoginResult.success(TokenPair tokens) =>
+      LoginResult._(tokens: tokens);
+
+  factory LoginResult.mfaRequired(MfaChallenge mfa) =>
+      LoginResult._(mfa: mfa);
+
+  final TokenPair? tokens;
+  final MfaChallenge? mfa;
+}
+
 /// Result of requesting an OTP code, including the delivery channels used,
 /// how long the code stays valid, and (when developer preview is enabled) the
 /// code itself.
@@ -74,10 +111,22 @@ class AuthService {
 
   final ApiClient api;
 
-  Future<TokenPair> signIn(String email, String password) async {
+  Future<LoginResult> signIn(String email, String password) async {
     final data = await api.post(
       '/api/v1/auth/login',
       body: {'email': email, 'password': password},
+    );
+    if (data['mfa_required'] == true) {
+      return LoginResult.mfaRequired(MfaChallenge.fromJson(data));
+    }
+    return LoginResult.success(TokenPair.fromJson(data));
+  }
+
+  Future<TokenPair> verifyMfa(
+      {required String mfaToken, required String code}) async {
+    final data = await api.post(
+      '/api/v1/auth/mfa/verify',
+      body: {'mfa_token': mfaToken, 'code': code},
     );
     return TokenPair.fromJson(data);
   }
@@ -151,19 +200,53 @@ class OnboarderSession extends ChangeNotifier {
   AuthUser? _user;
   String? _accessToken;
   String? _refreshToken;
+  MfaChallenge? _pendingMfa;
 
   AuthUser? get user => _user;
   bool get isAuthenticated => _user != null;
   String? get accessToken => _accessToken;
+  MfaChallenge? get pendingMfa => _pendingMfa;
+
+  Future<void> _completeSession(TokenPair tokens) async {
+    final user = await service.me(tokens.accessToken);
+    _accessToken = tokens.accessToken;
+    _refreshToken = tokens.refreshToken;
+    _user = user;
+    notifyListeners();
+  }
+
+  void cancelMfa() {
+    _pendingMfa = null;
+    notifyListeners();
+  }
 
   Future<bool> signIn(String email, String password) async {
     try {
-      final tokens = await service.signIn(email.trim(), password);
-      final user = await service.me(tokens.accessToken);
-      _accessToken = tokens.accessToken;
-      _refreshToken = tokens.refreshToken;
-      _user = user;
-      notifyListeners();
+      final result = await service.signIn(email.trim(), password);
+      if (result.mfa != null) {
+        _pendingMfa = result.mfa;
+        notifyListeners();
+        return false;
+      }
+      if (result.tokens != null) {
+        await _completeSession(result.tokens!);
+        _pendingMfa = null;
+        return true;
+      }
+      return false;
+    } on ApiException {
+      return false;
+    }
+  }
+
+  Future<bool> verifyMfaCode(String code) async {
+    final mfa = _pendingMfa;
+    if (mfa == null) return false;
+    try {
+      final tokens =
+          await service.verifyMfa(mfaToken: mfa.mfaToken, code: code);
+      await _completeSession(tokens);
+      _pendingMfa = null;
       return true;
     } on ApiException {
       return false;
@@ -192,19 +275,7 @@ class OnboarderSession extends ChangeNotifier {
     }
   }
 
-  /// Server-less login so the app can be explored before the backend (or its
-  /// database) is up. Enters an authenticated demo session immediately.
-  void enterDemo() {
-    _user = const AuthUser(
-      id: 'demo-onboarder',
-      email: 'onboarder@test.marketgo',
-      name: 'Demo Onboarder',
-      role: 'onboarder',
-    );
-    _accessToken = 'demo.access';
-    _refreshToken = 'demo.refresh';
-    notifyListeners();
-  }
+
 
   Future<void> logOut() async {
     final token = _accessToken;

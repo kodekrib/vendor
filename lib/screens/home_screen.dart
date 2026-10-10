@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../app.dart';
+
 import '../services/auth_service.dart';
 import 'account_tab.dart';
 import 'dashboard_tab.dart';
@@ -35,8 +35,7 @@ class _OnboarderHomeState extends State<OnboarderHome> {
   @override
   Widget build(BuildContext context) {
     final user = OnboarderSession.instance.user;
-    final isDemo =
-        user == null || (user.email.startsWith('demo') && user.email.contains('test'));
+    final isDemo = false;
 
     return Scaffold(
       appBar: AppBar(
@@ -44,24 +43,6 @@ class _OnboarderHomeState extends State<OnboarderHome> {
         title: Row(
           children: [
             Text(_titles[_index]),
-            if (isDemo)
-              Container(
-                margin: const EdgeInsets.only(left: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: OnboarderApp.brandTealLight,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  'TEST',
-                  style: TextStyle(
-                    color: OnboarderApp.brandTealDark,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.6,
-                  ),
-                ),
-              ),
           ],
         ),
         actions: [

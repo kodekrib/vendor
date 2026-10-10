@@ -56,12 +56,6 @@ class OnboardService extends ChangeNotifier {
 
   /// Attempt to connect to the API. Falls back to offline mode on failure.
   Future<void> connect(String token) async {
-    if (token == 'demo.access') {
-      _isOffline = true;
-      onOfflineChanged?.call(true);
-      notifyListeners();
-      return;
-    }
     _isOffline = false;
     onOfflineChanged?.call(false);
     await _loadDashboard(token);
@@ -395,7 +389,7 @@ class OnboardService extends ChangeNotifier {
   }
 
   Future<void> refresh(String token) async {
-    if (token == 'demo.access') return;
+
     _loading = true;
     notifyListeners();
     await _loadDashboard(token);

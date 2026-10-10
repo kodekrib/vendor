@@ -60,7 +60,7 @@ class _OnboardMoverScreenState extends State<OnboardMoverScreen> {
 
   Future<void> _loadVehicleTypes() async {
     final token = OnboarderSession.instance.accessToken;
-    if (token == null || token == 'demo.access') {
+    if (token == null) {
       setState(() => _vehicleTypes = _moverTypeFallback);
       return;
     }
@@ -123,7 +123,7 @@ class _OnboardMoverScreenState extends State<OnboardMoverScreen> {
     });
 
     final token = OnboarderSession.instance.accessToken;
-    if (token == null || token == 'demo.access') {
+    if (token == null) {
       setState(() {
         _submitting = false;
         _error = 'Please sign in with a real account to onboard movers.';

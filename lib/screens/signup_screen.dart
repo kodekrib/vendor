@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
-import 'home_screen.dart';
 
 /// Creates a new onboarder account. No backend exists yet, so success enters a
 /// demo session and shows the home shell (repository data is seeded offline).
@@ -68,17 +66,11 @@ class _SignupScreenState extends State<SignupScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 900));
     if (!mounted) return;
 
-    OnboarderSession.instance.enterDemo();
-
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
-      (route) => false,
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Welcome aboard! Your account is ready.'),
-      ),
-    );
+    setState(() {
+      _loading = false;
+      _error =
+          'Account creation is not available. Please contact support or use an existing account.';
+    });
   }
 
   @override
