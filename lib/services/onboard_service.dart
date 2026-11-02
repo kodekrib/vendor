@@ -4,17 +4,20 @@ import 'api_client.dart';
 
 /// API-backed onboarder data store.
 ///
-/// Replaces the in-memory [OnboardRepository] with real calls to the
-/// marketgo-api onboarding endpoints. The UI layer reads from this service
-/// via the same getters, so screens need minimal changes.
+/// Calls the marketgo-api onboarding endpoints and replaces the old
+/// in-memory [OnboardRepository] with real backend data.  The UI layer
+/// reads from this service via the same getters, so screens need minimal
+/// changes — they simply react to data changes.
 class OnboardService extends ChangeNotifier {
-  OnboardService._({ApiClient? api, this.onOfflineChanged})
-      : _api = api ?? ApiClient();
+  OnboardService._({ApiClient? api})
+      : _api = api ?? ApiClient(),
+        _loading = false;
 
   static final OnboardService instance = OnboardService._();
 
   final ApiClient _api;
-  final void Function(bool offline)? onOfflineChanged;
+
+  // --- State ---
 
   OnboarderProfile? _profile;
   List<VendorRecord> _vendors = [];
@@ -22,9 +25,8 @@ class OnboardService extends ChangeNotifier {
   List<MoverRecord> _movers = [];
   List<CommissionTxn> _txns = [];
   bool _loading = false;
-  bool _isOffline = true; // start offline until connected
 
-  // --- Getters (same interface as OnboardRepository) ---
+  // --- Getters (same interface as before, minus offline flag) ---
 
   OnboarderProfile? get profile => _profile;
   List<VendorRecord> get vendors => List.unmodifiable(_vendors);
@@ -32,7 +34,6 @@ class OnboardService extends ChangeNotifier {
   List<MoverRecord> get movers => List.unmodifiable(_movers);
   List<CommissionTxn> get txns => List.unmodifiable(_txns);
   bool get loading => _loading;
-  bool get isOffline => _isOffline;
 
   int get activeVendors => _vendors.where((v) => v.status == OnboardStatus.active).length;
   int get activeRiders => _riders.where((r) => r.status == OnboardStatus.active).length;
@@ -54,19 +55,22 @@ class OnboardService extends ChangeNotifier {
   Map<String, String> _auth(String token) =>
       {'Authorization': 'Bearer $token'};
 
-  /// Attempt to connect to the API. Falls back to offline mode on failure.
+  /// Connect to the API and load all data.  Falls back to an empty state
+  /// (no dummy data) when the backend is unreachable; the UI will show
+  /// empty lists / placeholder text accordingly.
   Future<void> connect(String token) async {
-    _isOffline = false;
-    onOfflineChanged?.call(false);
+    _loading = true;
+    notifyListeners();
     await _loadDashboard(token);
     await _loadVendors(token);
     await _loadRiders(token);
     await _loadMovers(token);
     await _loadEarnings(token);
+    _loading = false;
+    notifyListeners();
   }
 
   void disconnect() {
-    _isOffline = true;
     _profile = null;
     _vendors = [];
     _riders = [];
@@ -86,11 +90,7 @@ class OnboardService extends ChangeNotifier {
         phone: data['phone'] ?? '',
       );
     } catch (_) {
-      _profile = const OnboarderProfile(
-        name: 'Onboarder',
-        email: '',
-        phone: '',
-      );
+      _profile = null;
     }
   }
 
@@ -98,22 +98,25 @@ class OnboardService extends ChangeNotifier {
     try {
       final data = await _api.get('/api/v1/onboarder/vendors', headers: _auth(token));
       final list = data['vendors'];
-      if (list is! List) { _vendors = []; return; }
+      if (list is! List) {
+        _vendors = [];
+        return;
+      }
       _vendors = list.whereType<Map<String, dynamic>>().map((j) {
         return VendorRecord(
           id: '${j['id'] ?? 0}',
           storeName: j['store_name'] ?? '',
           ownerName: j['vendor_name'] ?? '',
           email: j['vendor_email'] ?? '',
-          phone: '',
-          category: '',
-          city: '',
-          address: '',
-          status: OnboardStatus.active,
+          phone: j['vendor_phone'] ?? '',
+          category: j['category'] ?? '',
+          city: j['city'] ?? '',
+          address: j['address'] ?? '',
+          status: onboardStatusFromName(j['status'] ?? 'active'),
           commissionRate: (j['commission_rate'] as num?)?.toDouble() ?? 2.5,
-          monthlyCommissions: 0,
-          icon: Icons.store_rounded,
-          color: const Color(0xFF16A34A),
+          monthlyCommissions: (j['monthly_commissions'] as num?)?.toInt() ?? 0,
+          icon: _iconFromName(j['store_type'] ?? 'store'),
+          color: _colorFromName(j['store_type'] ?? 'store'),
           joinedOn: j['onboarded_at'] ?? '',
         );
       }).toList();
@@ -126,19 +129,22 @@ class OnboardService extends ChangeNotifier {
     try {
       final data = await _api.get('/api/v1/onboarder/riders', headers: _auth(token));
       final list = data['riders'];
-      if (list is! List) { _riders = []; return; }
+      if (list is! List) {
+        _riders = [];
+        return;
+      }
       _riders = list.whereType<Map<String, dynamic>>().map((j) {
         return RiderRecord(
           id: '${j['id'] ?? 0}',
           name: j['rider_name'] ?? '',
           email: j['rider_email'] ?? '',
-          phone: '',
-          vehicle: '',
-          city: '',
-          status: OnboardStatus.active,
-          monthlyFareShare: 0,
-          icon: Icons.two_wheeler_rounded,
-          color: const Color(0xFF0D9488),
+          phone: j['rider_phone'] ?? '',
+          vehicle: j['vehicle_type'] ?? '',
+          city: j['city'] ?? '',
+          status: onboardStatusFromName(j['status'] ?? 'active'),
+          monthlyFareShare: (j['fare_share'] as num?)?.toInt() ?? 0,
+          icon: _iconFromName(j['vehicle_type'] ?? 'two_wheeler'),
+          color: _colorFromName(j['vehicle_type'] ?? 'two_wheeler'),
           joinedOn: j['onboarded_at'] ?? '',
         );
       }).toList();
@@ -151,16 +157,19 @@ class OnboardService extends ChangeNotifier {
     try {
       final data = await _api.get('/api/v1/onboarder/movers', headers: _auth(token));
       final list = data['movers'];
-      if (list is! List) { _movers = []; return; }
+      if (list is! List) {
+        _movers = [];
+        return;
+      }
       _movers = list.whereType<Map<String, dynamic>>().map((j) {
         return MoverRecord(
           id: '${j['id'] ?? 0}',
           name: j['rider_name'] ?? '',
           email: j['rider_email'] ?? '',
-          phone: '',
-          vehicleType: '',
-          plateNumber: '',
-          status: OnboardStatus.active,
+          phone: j['rider_phone'] ?? '',
+          vehicleType: j['vehicle_type'] ?? '',
+          plateNumber: j['plate_number'] ?? '',
+          status: onboardStatusFromName(j['status'] ?? 'active'),
           commissionRate: (j['commission_rate'] as num?)?.toDouble() ?? 2.5,
           icon: Icons.local_shipping_rounded,
           color: const Color(0xFFEA580C),
@@ -176,7 +185,10 @@ class OnboardService extends ChangeNotifier {
     try {
       final data = await _api.get('/api/v1/onboarder/earnings', headers: _auth(token));
       final txList = data['transactions'];
-      if (txList is! List) { _txns = []; return; }
+      if (txList is! List) {
+        _txns = [];
+        return;
+      }
       _txns = txList.whereType<Map<String, dynamic>>().map((j) {
         final kind = j['type'] == 'vendor_order'
             ? CommissionKind.vendor
@@ -237,9 +249,6 @@ class OnboardService extends ChangeNotifier {
           'delivery_fee': deliveryFee,
         },
       );
-      // Submit KYC for the newly created vendor.
-      // We need the vendor's user ID — the onboard endpoint returns it.
-      // For now, reload vendors which will pick up the new one.
       await _loadVendors(token);
       notifyListeners();
       return null; // success
@@ -268,8 +277,6 @@ class OnboardService extends ChangeNotifier {
     String vehicleColor = '',
   }) async {
     try {
-      // The backend persists rider KYC details up front during onboarding,
-      // so the whole payload is sent in a single request.
       await _api.post(
         '/api/v1/onboarder/riders',
         headers: _auth(token),
@@ -343,7 +350,7 @@ class OnboardService extends ChangeNotifier {
     }
   }
 
-  /// Fetch commission detail for a specific rider.
+  /// Fetch commission detail for a specific vendor.
   Future<VendorCommissionDetail?> fetchVendorCommissionDetail(
       String token, int vendorId) async {
     try {
@@ -389,7 +396,6 @@ class OnboardService extends ChangeNotifier {
   }
 
   Future<void> refresh(String token) async {
-
     _loading = true;
     notifyListeners();
     await _loadDashboard(token);
@@ -399,5 +405,27 @@ class OnboardService extends ChangeNotifier {
     await _loadEarnings(token);
     _loading = false;
     notifyListeners();
+  }
+
+  // --- Helpers for parsing vendor/rider type names into Icon / Color ---
+
+  IconData _iconFromName(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('motorcycle') || n.contains('bike')) return Icons.motorcycle_rounded;
+    if (n.contains('bicycle')) return Icons.directions_bike_rounded;
+    if (n.contains('car') || n.contains('sedan') || n.contains('vehicle')) return Icons.directions_car_rounded;
+    if (n.contains('van')) return Icons.local_shipping_rounded;
+    if (n.contains('truck') || n.contains('lorry')) return Icons.local_shipping_rounded;
+    return Icons.store_rounded;
+  }
+
+  Color _colorFromName(String name) {
+    final n = name.toLowerCase();
+    if (n.contains('motorcycle') || n.contains('bike')) return const Color(0xFF0D9488);
+    if (n.contains('bicycle')) return const Color(0xFF115E59);
+    if (n.contains('car') || n.contains('sedan') || n.contains('vehicle')) return const Color(0xFF0D9488);
+    if (n.contains('van')) return const Color(0xFF16A34A);
+    if (n.contains('truck') || n.contains('lorry')) return const Color(0xFFEA580C);
+    return const Color(0xFF6B7280);
   }
 }

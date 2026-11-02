@@ -48,18 +48,22 @@ class MfaChallenge {
   const MfaChallenge({
     required this.mfaToken,
     required this.expiresIn,
+    this.codeLength = 6,
     required this.channels,
     this.devCode,
   });
 
   final String mfaToken;
   final int expiresIn;
+  final int codeLength;
   final List<String> channels;
   final String? devCode;
 
   factory MfaChallenge.fromJson(Map<String, dynamic> json) {
     return MfaChallenge(
       mfaToken: json['mfa_token'] as String? ?? '',
+      codeLength:
+          ((json['code_length'] as num?)?.toInt() ?? 6).clamp(4, 8).toInt(),
       expiresIn: (json['expires_in'] as num?)?.toInt() ?? 0,
       channels: (json['channels'] as List?)?.map((e) => '$e').toList() ??
           const <String>[],
@@ -74,8 +78,7 @@ class LoginResult {
   factory LoginResult.success(TokenPair tokens) =>
       LoginResult._(tokens: tokens);
 
-  factory LoginResult.mfaRequired(MfaChallenge mfa) =>
-      LoginResult._(mfa: mfa);
+  factory LoginResult.mfaRequired(MfaChallenge mfa) => LoginResult._(mfa: mfa);
 
   final TokenPair? tokens;
   final MfaChallenge? mfa;
@@ -87,17 +90,21 @@ class LoginResult {
 class SendOtpResult {
   const SendOtpResult({
     required this.expiresIn,
+    this.codeLength = 6,
     required this.channels,
     this.devCode,
   });
 
   final int expiresIn;
+  final int codeLength;
   final List<String> channels;
   final String? devCode;
 
   factory SendOtpResult.fromJson(Map<String, dynamic> json) {
     return SendOtpResult(
       expiresIn: (json['expires_in'] as num?)?.toInt() ?? 600,
+      codeLength:
+          ((json['code_length'] as num?)?.toInt() ?? 6).clamp(4, 8).toInt(),
       channels: (json['channels'] as List?)?.map((e) => '$e').toList() ??
           const <String>[],
       devCode: json['dev_code'] as String?,
@@ -274,8 +281,6 @@ class OnboarderSession extends ChangeNotifier {
       return false;
     }
   }
-
-
 
   Future<void> logOut() async {
     final token = _accessToken;

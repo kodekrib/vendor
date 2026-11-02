@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-
-import '../services/auth_service.dart';
 import 'account_tab.dart';
 import 'dashboard_tab.dart';
 import 'earnings_tab.dart';
@@ -34,9 +32,6 @@ class _OnboarderHomeState extends State<OnboarderHome> {
 
   @override
   Widget build(BuildContext context) {
-    final user = OnboarderSession.instance.user;
-    final isDemo = false;
-
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,

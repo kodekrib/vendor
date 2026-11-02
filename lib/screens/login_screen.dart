@@ -100,14 +100,23 @@ if (result) {
               headers: {'Authorization': 'Bearer ${OnboarderSession.instance.accessToken}'});
           if (data['is_active'] == false) {
             // Vendor is disabled — show a blocked state instead of home
-            setState(() => _loading = false);
-            _error = 'Your vendor account has been disabled. Contact the administrator.';
+            if (!mounted) return;
+            setState(() {
+              _loading = false;
+              _error = 'Your vendor account has been disabled. Contact the administrator.';
+            });
             return;
           }
-        } catch (_) {
-          // If the check fails, proceed home (best-effort)
+        } catch (e) {
+          if (!mounted) return;
+          setState(() {
+            _loading = false;
+            _error = e is ApiException ? e.message : 'Unable to verify vendor account status.';
+          });
+          return;
         }
       }
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
       );
