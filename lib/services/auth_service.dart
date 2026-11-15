@@ -1,14 +1,31 @@
 import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 
+/// Formats the delivery channels reported by the OTP API for display, e.g.
+/// "SMS", "WhatsApp" or "email and SMS". Returns an empty string when the
+/// server did not report any channel.
+String describeOtpChannels(List<String> channels) {
+  const order = ['email', 'whatsapp', 'sms'];
+  const labels = {'email': 'email', 'whatsapp': 'WhatsApp', 'sms': 'SMS'};
+  final parts = [
+    for (final key in order)
+      if (channels.contains(key)) labels[key]!,
+  ];
+  if (parts.isEmpty) return '';
+  if (parts.length == 1) return parts.first;
+  return '${parts.take(parts.length - 1).join(', ')} and ${parts.last}';
+}
+
 class AuthUser {
   const AuthUser({
+    this.avatarUrl = '',
     required this.id,
     required this.email,
     required this.name,
     required this.role,
   });
 
+  final String avatarUrl;
   final String id;
   final String email;
   final String name;
@@ -16,6 +33,7 @@ class AuthUser {
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
     return AuthUser(
+      avatarUrl: json['avatar_url'] as String? ?? '',
       id: '${json['id']}',
       email: json['email'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -178,6 +196,47 @@ class AuthService {
     return TokenPair.fromJson(data);
   }
 
+  /// Creates a new onboarder account via the public registration endpoint.
+  /// Registration does not issue tokens, so the account must sign in afterwards.
+  Future<void> register({
+    required String name,
+    required String email,
+    required String password,
+    String role = 'onboarder',
+  }) async {
+    await api.post(
+      '/api/v1/auth/register',
+      body: <String, dynamic>{
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+      },
+    );
+  }
+
+  /// Starts a password reset by delivering a one-time code to the account's
+  /// email (falling back to WhatsApp or SMS when email is unavailable).
+  Future<SendOtpResult> forgotPassword(String email) async {
+    final data = await api.post(
+      '/api/v1/auth/forgot-password',
+      body: {'email': email},
+    );
+    return SendOtpResult.fromJson(data);
+  }
+
+  /// Completes a password reset with the code delivered by [forgotPassword].
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await api.post(
+      '/api/v1/auth/reset-password',
+      body: {'email': email, 'code': code, 'new_password': newPassword},
+    );
+  }
+
   Future<AuthUser> me(String accessToken) async {
     final data = await api.get(
       '/api/v1/auth/me',
@@ -199,23 +258,37 @@ class AuthService {
 
 /// Singleton session that keeps the onboarder's token + profile in memory.
 class OnboarderSession extends ChangeNotifier {
-  OnboarderSession._();
+  OnboarderSession({AuthService? service}) : service = service ?? AuthService();
 
-  static final OnboarderSession instance = OnboarderSession._();
+  static final OnboarderSession instance = OnboarderSession();
 
-  final AuthService service = AuthService();
+  final AuthService service;
+  ApiClient get api => service.api;
   AuthUser? _user;
   String? _accessToken;
   String? _refreshToken;
   MfaChallenge? _pendingMfa;
 
   AuthUser? get user => _user;
+  Future<void> refreshProfile() async {
+    final token = accessToken;
+    if (token == null) return;
+    final data = await api
+        .get('/api/v1/auth/me', headers: {'Authorization': 'Bearer $token'});
+    _user = AuthUser.fromJson(Map<String, dynamic>.from(data['user'] as Map));
+    notifyListeners();
+  }
+
   bool get isAuthenticated => _user != null;
   String? get accessToken => _accessToken;
   MfaChallenge? get pendingMfa => _pendingMfa;
 
   Future<void> _completeSession(TokenPair tokens) async {
     final user = await service.me(tokens.accessToken);
+    if (user.role != 'onboarder' && user.role != 'vendor') {
+      throw const ApiException(
+          'Sign in with a vendor or field onboarder account.');
+    }
     _accessToken = tokens.accessToken;
     _refreshToken = tokens.refreshToken;
     _user = user;
@@ -242,7 +315,7 @@ class OnboarderSession extends ChangeNotifier {
       }
       return false;
     } on ApiException {
-      return false;
+      rethrow;
     }
   }
 
@@ -271,11 +344,7 @@ class OnboarderSession extends ChangeNotifier {
   Future<bool> signInWithOtp(String phone, String code) async {
     try {
       final tokens = await service.verifyOtp(phone: phone, code: code);
-      final user = await service.me(tokens.accessToken);
-      _accessToken = tokens.accessToken;
-      _refreshToken = tokens.refreshToken;
-      _user = user;
-      notifyListeners();
+      await _completeSession(tokens);
       return true;
     } on ApiException {
       return false;

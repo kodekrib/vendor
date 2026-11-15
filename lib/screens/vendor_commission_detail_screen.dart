@@ -3,6 +3,7 @@ import '../app.dart';
 import '../models/onboarding.dart';
 import '../services/onboard_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/onboarder_app_bar.dart';
 
 class VendorCommissionDetailScreen extends StatefulWidget {
   final int vendorId;
@@ -47,9 +48,7 @@ class _VendorCommissionDetailScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.storeName} Commission'),
-      ),
+      appBar: OnboarderAppBar(title: '${widget.storeName} Commission'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _detail == null
@@ -102,8 +101,7 @@ class _VendorCommissionDetailScreenState
                   ),
             ),
             const SizedBox(height: 4),
-            Text(d.vendorName,
-                style: Theme.of(context).textTheme.bodyMedium),
+            Text(d.vendorName, style: Theme.of(context).textTheme.bodyMedium),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -111,7 +109,8 @@ class _VendorCommissionDetailScreenState
                 const SizedBox(width: 24),
                 _stat('Orders', '${d.totalOrders}'),
                 const SizedBox(width: 24),
-                _stat('Earned', '${OnboarderApp.currencySymbol}${d.totalEarnings.toStringAsFixed(0)}'),
+                _stat('Earned',
+                    '${OnboarderApp.currencySymbol}${d.totalEarnings.toStringAsFixed(2)}'),
               ],
             ),
           ],
@@ -155,7 +154,7 @@ class _VendorCommissionDetailScreenState
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '+${OnboarderApp.currencySymbol}${l.onboarderCut.toStringAsFixed(0)}',
+              '+${OnboarderApp.currencySymbol}${l.onboarderCut.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: Colors.green,
                 fontWeight: FontWeight.bold,

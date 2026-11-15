@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Creates a new onboarder account. No backend exists yet, so success enters a
-/// demo session and shows the home shell (repository data is seeded offline).
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+
+/// Creates a new onboarder account through `/api/v1/auth/register`. The new
+/// account signs in afterwards — registration does not issue tokens.
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
 
@@ -50,8 +53,8 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() => _error = 'Enter a valid email address.');
       return;
     }
-    if (password.length < 6) {
-      setState(() => _error = 'Password must be at least 6 characters.');
+    if (password.length < 8) {
+      setState(() => _error = 'Password must be at least 8 characters.');
       return;
     }
     if (password != confirm) {
@@ -63,14 +66,41 @@ class _SignupScreenState extends State<SignupScreen> {
       _loading = true;
       _error = null;
     });
-    await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-
-    setState(() {
-      _loading = false;
-      _error =
-          'Account creation is not available. Please contact support or use an existing account.';
-    });
+    try {
+      await AuthService()
+          .register(name: name, email: email, password: password);
+      if (!mounted) return;
+      setState(() => _loading = false);
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Account created'),
+          content: const Text(
+            'Your onboarder account is ready. Sign in to continue.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not create account. Please try again.';
+      });
+    }
   }
 
   @override
@@ -104,7 +134,6 @@ class _SignupScreenState extends State<SignupScreen> {
                 style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
               ),
               const SizedBox(height: 24),
-
               TextField(
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
@@ -167,7 +196,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   prefixIcon: Icon(Icons.lock_outline_rounded),
                 ),
               ),
-
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -196,7 +224,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ),
               ],
-
               const SizedBox(height: 20),
               SizedBox(
                 height: 54,

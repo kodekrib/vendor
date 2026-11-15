@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/login_screen.dart';
 import 'services/settings_service.dart';
+import 'widgets/branding_host.dart';
 
 class OnboarderApp extends StatelessWidget {
   const OnboarderApp({super.key});
@@ -17,19 +19,57 @@ class OnboarderApp extends StatelessWidget {
   static bool maintenanceMode = false;
   static String currencySymbol = '₦';
 
+  /// Font families offered in the marketgo-admin panel that map to Google Fonts.
+  static const List<String> _googleFonts = [
+    'Poppins',
+    'Inter',
+    'Nunito Sans',
+    'Lato',
+    'Open Sans',
+    'Roboto',
+  ];
+
+  /// Supported Google fonts use the admin selection. Empty/system selections
+  /// use the platform font without downloading a replacement.
+  static String get activeFontFamily =>
+      _googleFonts.contains(fontFamily) ? fontFamily : '';
+
+  /// [base] text theme with the active Google Font applied. The font is
+  /// downloaded and cached by the google_fonts package on first use.
+  static TextTheme applyFont(TextTheme base) {
+    if (activeFontFamily.isEmpty) return base;
+    switch (activeFontFamily) {
+      case 'Poppins':
+        return GoogleFonts.poppinsTextTheme(base);
+      case 'Nunito Sans':
+        return GoogleFonts.nunitoSansTextTheme(base);
+      case 'Lato':
+        return GoogleFonts.latoTextTheme(base);
+      case 'Open Sans':
+        return GoogleFonts.openSansTextTheme(base);
+      case 'Roboto':
+        return GoogleFonts.robotoTextTheme(base);
+      default:
+        return GoogleFonts.interTextTheme(base);
+    }
+  }
+
   /// Apply branding loaded from the admin-managed public settings.
   static void applyBranding(AppSettings s) {
-    if (s.brandColor != const Color(0xFF0D9488)) brandTeal = s.brandColor;
-    if (s.brandDarkColor != const Color(0xFF115E59)) brandTealDark = s.brandDarkColor;
-    if (s.brandLightColor != const Color(0xFFCCFBF1)) brandTealLight = s.brandLightColor;
+    brandTeal = s.brandColor;
+    brandTealDark = s.brandDarkColor;
+    brandTealLight = s.brandLightColor;
     appName = s.appName;
-    if (s.fontFamily.isNotEmpty) fontFamily = s.fontFamily;
+    fontFamily = s.fontFamily;
     if (s.currencySymbol.isNotEmpty) currencySymbol = s.currencySymbol;
     maintenanceMode = s.maintenanceMode;
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      BrandingHost(apply: applyBranding, builder: _buildApp);
+
+  Widget _buildApp(BuildContext context) {
     final base = Theme.of(context);
     final colorScheme = ColorScheme.fromSeed(
       seedColor: brandTeal,
@@ -41,6 +81,7 @@ class OnboarderApp extends StatelessWidget {
       title: appName,
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
+        extensions: [...base.extensions.values, BrandingIdentity(appName)],
         colorScheme: colorScheme,
         scaffoldBackgroundColor: surface,
         appBarTheme: const AppBarTheme(
@@ -55,17 +96,18 @@ class OnboarderApp extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        textTheme: base.textTheme
-            .apply(
-              bodyColor: ink,
-              displayColor: ink,
-            )
-            .apply(fontFamily: fontFamily.isEmpty ? null : fontFamily),
+        textTheme: OnboarderApp.applyFont(
+          base.textTheme.apply(
+            bodyColor: ink,
+            displayColor: ink,
+          ),
+        ),
         chipTheme: base.chipTheme.copyWith(
           backgroundColor: surfaceMuted,
           labelStyle: const TextStyle(color: ink, fontWeight: FontWeight.w700),
           side: const BorderSide(color: Color(0xFFE4E7EB)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
@@ -75,8 +117,10 @@ class OnboarderApp extends StatelessWidget {
             disabledForegroundColor: Colors.white,
             elevation: 0,
             minimumSize: const Size(0, 52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            textStyle:
+                const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
@@ -85,8 +129,10 @@ class OnboarderApp extends StatelessWidget {
             backgroundColor: Colors.white,
             side: const BorderSide(color: Color(0xFFCFD6DC)),
             minimumSize: const Size(0, 52),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            textStyle:
+                const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
           ),
         ),
         textButtonTheme: TextButtonThemeData(
@@ -148,6 +194,8 @@ class OnboarderApp extends StatelessWidget {
           behavior: SnackBarBehavior.floating,
         ),
       ),
+      builder: (context, child) =>
+          MaintenanceGate(child: child ?? const SizedBox.shrink()),
       home: const LoginScreen(),
     );
   }

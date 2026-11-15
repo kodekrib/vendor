@@ -3,6 +3,7 @@ import '../app.dart';
 import '../models/onboarding.dart';
 import '../services/onboard_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/onboarder_app_bar.dart';
 
 class RiderCommissionDetailScreen extends StatefulWidget {
   final int riderId;
@@ -45,9 +46,7 @@ class _RiderCommissionDetailScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.riderName} Commission'),
-      ),
+      appBar: OnboarderAppBar(title: '${widget.riderName} Commission'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _detail == null
@@ -106,7 +105,8 @@ class _RiderCommissionDetailScreenState
                 const SizedBox(width: 24),
                 _stat('Deliveries', '${d.totalDeliveries}'),
                 const SizedBox(width: 24),
-                _stat('Earned', '${OnboarderApp.currencySymbol}${d.totalEarnings.toStringAsFixed(0)}'),
+                _stat('Earned',
+                    '${OnboarderApp.currencySymbol}${d.totalEarnings.toStringAsFixed(2)}'),
               ],
             ),
           ],
@@ -142,14 +142,14 @@ class _RiderCommissionDetailScreenState
         ),
         subtitle: Text(
           'Fee: ${OnboarderApp.currencySymbol}${l.deliveryFee.toStringAsFixed(0)} · '
-          'Rate: ${l.commissionRate}%',
+          'Recorded commission',
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '+${OnboarderApp.currencySymbol}${l.onboarderCut.toStringAsFixed(0)}',
+              '+${OnboarderApp.currencySymbol}${l.onboarderCut.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: Colors.green,
                 fontWeight: FontWeight.bold,

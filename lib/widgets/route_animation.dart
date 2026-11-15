@@ -15,10 +15,12 @@ class AnimatedRouteBackdrop extends StatefulWidget {
   const AnimatedRouteBackdrop({
     super.key,
     this.markIcon = Icons.handshake_rounded,
+    this.showMarker = true,
     this.duration = const Duration(seconds: 9),
   });
 
   final IconData markIcon;
+  final bool showMarker;
   final Duration duration;
 
   @override
@@ -83,28 +85,29 @@ class _AnimatedRouteBackdropState extends State<AnimatedRouteBackdrop>
             CustomPaint(
               painter: _RoadsPainter(size: size, route: route, lanes: lanes),
             ),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                final (offset: pos, angle: heading) =
-                    _pointAlong(route, _controller.value);
-                return Positioned(
-                  left: pos.dx - 16,
-                  top: pos.dy - 16,
-                  child: Transform.rotate(
-                    angle: heading,
-                    child: Icon(
-                      widget.markIcon,
-                      size: 32,
-                      color: Colors.white,
-                      shadows: const [
-                        Shadow(color: Colors.black26, blurRadius: 8),
-                      ],
+            if (widget.showMarker)
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  final (offset: pos, angle: heading) =
+                      _pointAlong(route, _controller.value);
+                  return Positioned(
+                    left: pos.dx - 16,
+                    top: pos.dy - 16,
+                    child: Transform.rotate(
+                      angle: heading,
+                      child: Icon(
+                        widget.markIcon,
+                        size: 32,
+                        color: Colors.white,
+                        shadows: const [
+                          Shadow(color: Colors.black26, blurRadius: 8),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
           ],
         );
       },

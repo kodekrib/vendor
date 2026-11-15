@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../widgets/onboarder_app_bar.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+import '../services/onboard_service.dart';
+import 'kyc_status_screen.dart';
+import 'login_screen.dart';
 import 'account_tab.dart';
 import 'dashboard_tab.dart';
 import 'earnings_tab.dart';
 import 'movers_tab.dart';
-import 'notifications_screen.dart';
 import 'riders_tab.dart';
 import 'vendors_tab.dart';
 
@@ -20,6 +24,35 @@ class OnboarderHome extends StatefulWidget {
 
 class _OnboarderHomeState extends State<OnboarderHome> {
   int _index = 0;
+  bool _checking = true;
+  bool _submitted = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkVerification();
+  }
+
+  Future<void> _checkVerification() async {
+    setState(() {
+      _checking = true;
+      _error = null;
+    });
+    try {
+      final token = OnboarderSession.instance.accessToken;
+      if (token == null) throw const ApiException('Sign in to continue.');
+      final data = await ApiClient().get('/api/v1/onboarder/profile',
+          headers: {'Authorization': 'Bearer $token'});
+      final submitted = data['profile']['kyc'] is Map;
+      if (submitted) await OnboardService.instance.connect(token);
+      if (mounted) setState(() => _submitted = submitted);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
 
   static const _titles = [
     'Dashboard',
@@ -32,24 +65,32 @@ class _OnboarderHomeState extends State<OnboarderHome> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checking) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (_error != null) {
+      return Scaffold(
+          body: SafeArea(
+              child: Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(_error!),
+        TextButton(onPressed: _checkVerification, child: const Text('Retry')),
+        TextButton(
+            onPressed: () async {
+              await OnboarderSession.instance.logOut();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+                  (_) => false);
+            },
+            child: const Text('Sign out')),
+      ]))));
+    }
+    if (!_submitted) return KYCStatusScreen(onSubmitted: _checkVerification);
     return Scaffold(
-      appBar: AppBar(
+      appBar: OnboarderAppBar(
         automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            Text(_titles[_index]),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
-            ),
-            icon: const Icon(Icons.notifications_none_rounded),
-            tooltip: 'Notifications',
-          ),
-        ],
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        title: _titles[_index],
       ),
       body: IndexedStack(
         index: _index,

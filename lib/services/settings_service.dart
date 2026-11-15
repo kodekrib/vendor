@@ -4,6 +4,12 @@ import 'package:http/http.dart' as http;
 import '../services/api_client.dart';
 
 class AppSettings {
+  final String releaseVersion;
+  final String releaseDate;
+  final String poweredBy;
+  final String description;
+  final String supportEmail;
+  final String supportPhone;
   final String appName;
   final String logoUrl;
   final Color brandColor;
@@ -16,6 +22,12 @@ class AppSettings {
   final bool maintenanceMode;
 
   const AppSettings({
+    this.supportEmail = '',
+    this.supportPhone = '',
+    this.releaseVersion = '',
+    this.releaseDate = '',
+    this.poweredBy = 'MarketGO',
+    this.description = '',
     this.appName = 'MarketGO Vendor',
     this.logoUrl = '',
     this.brandColor = const Color(0xFF0D9488),
@@ -30,11 +42,20 @@ class AppSettings {
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     return AppSettings(
+      supportEmail: json['support_email'] as String? ?? '',
+      supportPhone: json['support_phone'] as String? ?? '',
+      releaseVersion: json['release_version'] as String? ?? '',
+      releaseDate: json['release_date'] as String? ?? '',
+      poweredBy: json['powered_by'] as String? ?? 'MarketGO',
+      description: json['description'] as String? ?? '',
       appName: (json['app_name'] as String?) ?? 'MarketGO Vendor',
       logoUrl: (json['logo_url'] as String?) ?? '',
-      brandColor: _parseHex(json['brand_color'] as String?, const Color(0xFF0D9488)),
-      brandDarkColor: _parseHex(json['brand_dark_color'] as String?, const Color(0xFF115E59)),
-      brandLightColor: _parseHex(json['brand_light_color'] as String?, const Color(0xFFCCFBF1)),
+      brandColor:
+          _parseHex(json['brand_color'] as String?, const Color(0xFF0D9488)),
+      brandDarkColor: _parseHex(
+          json['brand_dark_color'] as String?, const Color(0xFF115E59)),
+      brandLightColor: _parseHex(
+          json['brand_light_color'] as String?, const Color(0xFFCCFBF1)),
       fontFamily: (json['font_family'] as String?) ?? '',
       currencyCode: (json['currency_code'] as String?) ?? 'NGN',
       currencySymbol: (json['currency_symbol'] as String?) ?? '₦',
@@ -53,18 +74,32 @@ class AppSettings {
 }
 
 class SettingsService {
+  static final current = ValueNotifier<AppSettings>(const AppSettings());
+  static bool hasLoaded = false;
+  static bool lastFetchFailed = false;
+  static Future<AppSettings>? _pending;
+
+  static Future<AppSettings> fetchSettings() =>
+      _pending ??= _fetch().whenComplete(() => _pending = null);
+
   /// Fetch public app settings (no auth required). Falls back to defaults
   /// when the server is not running, so the app stays usable offline.
-  static Future<AppSettings> fetchSettings() async {
-    final url = Uri.parse('${defaultApiBaseUrl()}/api/v1/settings');
+  static Future<AppSettings> _fetch() async {
+    final url = Uri.parse('${defaultApiBaseUrl()}/api/v1/settings?app=vendor');
     try {
       final res = await http.get(url).timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
-        return AppSettings.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+        final settings =
+            AppSettings.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+        hasLoaded = true;
+        lastFetchFailed = false;
+        current.value = settings;
+        return settings;
       }
     } catch (_) {
       // Fall back to defaults when offline or the server is unreachable.
     }
-    return const AppSettings();
+    lastFetchFailed = true;
+    return current.value;
   }
 }

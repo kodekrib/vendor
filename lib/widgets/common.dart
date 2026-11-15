@@ -3,22 +3,23 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../models/onboarding.dart';
 
-/// Formats an amount in whole currency units, e.g. 82000 -> "₦82,000".
-String formatPrice(int value) {
-  final s = value.toString();
+/// Formats an amount in currency units, e.g. 82000 -> "₦82,000".
+String formatPrice(num value) {
+  final parts = value.toStringAsFixed(2).split('.');
+  final s = parts.first;
   final buffer = StringBuffer();
   for (var i = 0; i < s.length; i++) {
     if (i > 0 && (s.length - i) % 3 == 0) buffer.write(',');
     buffer.write(s[i]);
   }
-  return '${OnboarderApp.currencySymbol}$buffer';
+  return '${OnboarderApp.currencySymbol}$buffer.${parts.last}';
 }
 
 /// A formatted price label.
 class PriceText extends StatelessWidget {
   const PriceText(this.value, {super.key, this.size, this.weight});
 
-  final int value;
+  final num value;
   final double? size;
   final FontWeight? weight;
 
@@ -111,7 +112,8 @@ class PageHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+            child:
+                Text(title, style: Theme.of(context).textTheme.headlineMedium),
           ),
           if (trailing != null) trailing!,
         ],

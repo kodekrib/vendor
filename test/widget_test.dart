@@ -2,53 +2,48 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:vendor/app.dart';
+import 'package:vendor/screens/dashboard_tab.dart';
 import 'package:vendor/screens/home_screen.dart';
-
+import 'package:vendor/screens/onboard_mover_screen.dart';
+import 'package:vendor/widgets/animated_3d.dart';
 import 'package:vendor/widgets/route_animation.dart';
+import 'package:vendor/widgets/skeuo.dart';
 
 void main() {
   setUpAll(() {
     kRouteAnimationEnabled = false;
+    kHeroAnimationsEnabled = false;
   });
 
-  testWidgets('login screen renders with test-mode entry', (tester) async {
+  testWidgets('login screen renders with moving bike', (tester) async {
     await tester.pumpWidget(const OnboarderApp());
-
     expect(find.text('Create account'), findsOneWidget);
-    expect(
-      find.widgetWithText(ElevatedButton, 'Sign in'),
-      findsOneWidget,
-    );
+    expect(find.widgetWithText(SkeuoButton, 'Sign in'), findsOneWidget);
+    final backdrop = tester
+        .widget<AnimatedRouteBackdrop>(find.byType(AnimatedRouteBackdrop));
+    expect(backdrop.showMarker, isTrue);
+    expect(backdrop.markIcon, Icons.moped_rounded);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('can navigate to onboarding screens from tabs', (tester) async {
-    // Demo auth removed; skip or set up authenticated state differently if needed.
+  testWidgets('home blocks dashboard access without a session', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: OnboarderHome()));
+    await tester.pump();
+    expect(find.text('Sign in to continue.'), findsOneWidget);
+    expect(find.text('Quick actions'), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+  });
 
-    expect(find.text('Quick actions'), findsOneWidget);
-
-    Finder navTab(String label) => find.descendant(
-          of: find.byType(NavigationBar),
-          matching: find.text(label),
-        );
-
-    await tester.tap(navTab('Vendors'));
+  testWidgets('dashboard mover CTA opens mover onboarding', (tester) async {
+    await tester
+        .pumpWidget(const MaterialApp(home: Scaffold(body: DashboardTab())));
+    await tester.scrollUntilVisible(find.text('Onboard mover'), 180);
+    await tester.ensureVisible(find.text('Onboard mover'));
     await tester.pumpAndSettle();
-    expect(find.text('Onboard'), findsOneWidget);
-
-    await tester.tap(find.text('Onboard'));
-    await tester.pumpAndSettle();
-    expect(find.text('Store name'), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'Onboard vendor'), findsOneWidget);
-
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    await tester.tap(navTab('Riders'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(navTab('Earnings'));
-    await tester.pumpAndSettle();
-    expect(find.text('Request payout'), findsOneWidget);
+    await tester.tap(find.text('Onboard mover'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.byType(OnboardMoverScreen), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 }

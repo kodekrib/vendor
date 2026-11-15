@@ -47,6 +47,14 @@ class _MfaScreenState extends State<MfaScreen> {
     super.dispose();
   }
 
+  /// " by email and SMS" (or similar) when the server reported the challenge
+  /// channels; empty when nothing was reported.
+  String get _sentVia {
+    final label = describeOtpChannels(
+        OnboarderSession.instance.pendingMfa?.channels ?? const []);
+    return label.isEmpty ? '' : ' by $label';
+  }
+
   void _onCodeChanged(String value) {
     final digits =
         value.replaceAll(RegExp(r'[^0-9]'), '').padRight(_digits.length, ' ');
@@ -128,7 +136,7 @@ class _MfaScreenState extends State<MfaScreen> {
             Text('Enter the code', style: theme.textTheme.headlineSmall),
             const SizedBox(height: 6),
             Text(
-              'We sent a verification code to ${widget.email}.',
+              'We sent a verification code to ${widget.email}$_sentVia.',
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 24),

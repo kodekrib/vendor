@@ -59,7 +59,7 @@ class VendorRecord {
     required this.monthlyCommissions,
     required this.icon,
     required this.color,
-    this.joinedOn = 'Sep 2026',
+    this.joinedOn = '',
   });
 
   final String id;
@@ -90,7 +90,7 @@ class RiderRecord {
     required this.monthlyFareShare,
     required this.icon,
     required this.color,
-    this.joinedOn = 'Sep 2026',
+    this.joinedOn = '',
   });
 
   final String id;
@@ -121,7 +121,7 @@ class MoverRecord {
     required this.commissionRate,
     required this.icon,
     required this.color,
-    this.joinedOn = 'Sep 2026',
+    this.joinedOn = '',
   });
 
   final String id;
@@ -148,7 +148,7 @@ class CommissionTxn {
 
   final String id;
   final String label;
-  final int amount;
+  final double amount;
   final String date;
   final CommissionKind kind;
 }
@@ -318,6 +318,12 @@ const List<String> vendorCategories = [
   'Services',
 ];
 
-const List<String> riderVehicles = ['Motorcycle', 'Bicycle', 'Car', 'Van', 'Truck'];
+const List<String> riderVehicles = [
+  'Motorcycle',
+  'Bicycle',
+  'Car',
+  'Van',
+  'Truck'
+];
 
 const double defaultCommissionRate = 2.5;

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../app.dart';
 import '../services/auth_service.dart';
+import '../services/api_client.dart';
+import 'bank_account_screen.dart';
 import '../services/payment_service.dart';
+import '../widgets/onboarder_app_bar.dart';
 
 class WithdrawalScreen extends StatefulWidget {
   const WithdrawalScreen({super.key});
@@ -15,6 +18,8 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   List<Map<String, dynamic>> _wallets = [];
   List<Map<String, dynamic>> _withdrawals = [];
   bool _loading = true;
+  double? _available;
+  String? _loadError;
   bool _submitting = false;
 
   final _amountController = TextEditingController();
@@ -27,29 +32,53 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     final token = OnboarderSession.instance.accessToken ?? '';
     try {
+      final balance = await _paymentService.balance(token);
       final results = await Future.wait([
         _paymentService.listWallets(token),
         _paymentService.listWithdrawals(token),
       ]);
       if (mounted) {
         setState(() {
+          _available = (balance['available_minor'] as num).toDouble() / 100;
+          _loadError = null;
           _wallets = results[0];
+          _selectedWallet = null;
           _withdrawals = results[1];
           _loading = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _available = null;
+          _loadError = e is ApiException
+              ? e.message
+              : 'Could not load withdrawal details. Please try again.';
+        });
+      }
     }
   }
 
   Future<void> _submitWithdrawal() async {
+    if (_submitting) return;
     final amount = double.tryParse(_amountController.text) ?? 0;
-    if (amount < 100 || _selectedWallet == null) {
+    if (!amount.isFinite ||
+        amount < 100 ||
+        (amount * 100 - (amount * 100).round()).abs() > 0.000001 ||
+        _selectedWallet == null ||
+        _available == null ||
+        amount > _available!) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Minimum withdrawal is ${OnboarderApp.currencySymbol}100')),
+        SnackBar(
+            content: Text(
+                'Choose a bank account and an amount between ${OnboarderApp.currencySymbol}100 and your available balance')),
       );
       return;
     }
@@ -59,7 +88,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
       await _paymentService.withdraw(
         token,
         amount: amount,
-        walletId: _selectedWallet!['id'],
+        walletId: int.parse('${_selectedWallet!['id']}'),
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -67,7 +96,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
         );
         _amountController.clear();
         setState(() => _selectedWallet = null);
-        _load();
+        await _load();
       }
     } catch (e) {
       if (mounted) {
@@ -83,7 +112,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Withdraw Earnings')),
+      appBar: const OnboarderAppBar(title: 'Withdraw Earnings'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -91,7 +120,26 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_available != null)
+                    Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Text(
+                            'Available: ${OnboarderApp.currencySymbol}${_available!.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.bold))),
+                  if (_loadError != null)
+                    Column(children: [
+                      Text(_loadError!),
+                      TextButton(onPressed: _load, child: const Text('Retry'))
+                    ]),
                   _buildWithdrawForm(),
+                  if (_withdrawals.any((w) =>
+                      w['status'] == 'pending' || w['status'] == 'processing'))
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Text(
+                          'Your previous withdrawal is still being processed. You can request another once it is resolved.'),
+                    ),
                   const SizedBox(height: 24),
                   Text(
                     'Withdrawal History',
@@ -104,7 +152,8 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(20),
-                        child: Text('No withdrawals yet.', style: TextStyle(color: Colors.grey[600])),
+                        child: Text('No withdrawals yet.',
+                            style: TextStyle(color: Colors.grey[600])),
                       ),
                     )
                   else
@@ -119,15 +168,24 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          title: Text('${OnboarderApp.currencySymbol}${(w['amount'] ?? 0).toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('${w['bank_name']} • ${w['account_number']}'),
+                          title: Text(
+                              '${OnboarderApp.currencySymbol}${(num.tryParse('${w['amount']}') ?? 0).toStringAsFixed(2)}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(
+                              '${w['bank_name']} • ${w['account_number']}'),
                           trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: color.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(status.toUpperCase(), style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+                            child: Text(status.toUpperCase(),
+                                style: TextStyle(
+                                    color: color,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold)),
                           ),
                         ),
                       );
@@ -152,20 +210,36 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.warning_amber, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('Add a bank account first in Account > Bank Accounts.')),
-                  ],
-                ),
+                child: Column(children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: Colors.orange),
+                      SizedBox(width: 8),
+                      Expanded(
+                          child: Text(
+                              'Add a bank account first in Account > Bank Accounts.')),
+                    ],
+                  ),
+                  TextButton(
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                                builder: (_) => const BankAccountScreen()));
+                        if (mounted) await _load();
+                      },
+                      child: const Text('Add bank account'))
+                ]),
               )
             else ...[
               DropdownButtonFormField<Map<String, dynamic>>(
                 value: _selectedWallet,
-                decoration: const InputDecoration(labelText: 'Withdraw to', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                    labelText: 'Withdraw to', border: OutlineInputBorder()),
                 items: _wallets
-                    .map((w) => DropdownMenuItem(value: w, child: Text('${w['bank_name']} - ${w['account_number']}')))
+                    .map((w) => DropdownMenuItem(
+                        value: w,
+                        child:
+                            Text('${w['bank_name']} - ${w['account_number']}')))
                     .toList(),
                 onChanged: (w) => setState(() => _selectedWallet = w),
               ),
@@ -173,15 +247,29 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
               TextField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: 'Amount (${OnboarderApp.currencySymbol})', border: const OutlineInputBorder(), prefixText: '${OnboarderApp.currencySymbol} '),
+                decoration: InputDecoration(
+                    labelText: 'Amount (${OnboarderApp.currencySymbol})',
+                    border: const OutlineInputBorder(),
+                    prefixText: '${OnboarderApp.currencySymbol} '),
               ),
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submitting ? null : _submitWithdrawal,
+                  onPressed: _submitting ||
+                          _available == null ||
+                          _available! < 100 ||
+                          _withdrawals.any((w) =>
+                              w['status'] == 'pending' ||
+                              w['status'] == 'processing')
+                      ? null
+                      : _submitWithdrawal,
                   child: _submitting
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
                       : const Text('Request Withdrawal'),
                 ),
               ),

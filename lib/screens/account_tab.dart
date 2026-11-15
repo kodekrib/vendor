@@ -1,3 +1,5 @@
+import '../widgets/profile_photo.dart';
+import 'app_info_screen.dart';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
@@ -8,6 +10,7 @@ import 'bank_account_screen.dart';
 import 'info_screen.dart';
 import 'kyc_status_screen.dart';
 import 'login_screen.dart';
+import 'profile_screen.dart';
 import 'withdrawal_screen.dart';
 
 class AccountTab extends StatelessWidget {
@@ -16,11 +19,11 @@ class AccountTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final repo = OnboardService.instance;
-    final profile = repo.profile;
 
     return AnimatedBuilder(
-      animation: repo,
+      animation: Listenable.merge([repo, OnboarderSession.instance]),
       builder: (context, child) {
+        final profile = repo.profile;
         return AppScrollTab(
           slivers: [
             SliverToBoxAdapter(
@@ -53,39 +56,32 @@ class AccountTab extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 62,
-                        height: 62,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF0F3D3A), Color(0xFF0D9488)],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          (profile?.name ?? '').isEmpty
-                              ? '?'
-                              : profile!.name[0].toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 26,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
+                      ProfilePhoto(
+                          api: OnboarderSession.instance.api,
+                          tokenProvider: () =>
+                              OnboarderSession.instance.accessToken,
+                          avatarUrl:
+                              OnboarderSession.instance.user?.avatarUrl ?? '',
+                          name:
+                              OnboarderSession.instance.user?.name ?? 'Account',
+                          onUpdated: OnboarderSession.instance.refreshProfile,
+                          radius: 34),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(profile?.name ?? '',
+                            Text(
+                                OnboarderSession.instance.user?.name ??
+                                    profile?.name ??
+                                    '',
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w800, fontSize: 17)),
                             const SizedBox(height: 2),
-                            Text(profile?.email ?? '',
+                            Text(
+                                OnboarderSession.instance.user?.email ??
+                                    profile?.email ??
+                                    '',
                                 style: const TextStyle(
                                     fontSize: 12.5, color: Color(0xFF6B7280))),
                             const SizedBox(height: 2),
@@ -93,7 +89,7 @@ class AccountTab extends StatelessWidget {
                               color: OnboarderApp.brandTealLight,
                               borderRadius: BorderRadius.circular(999),
                               child: Padding(
-                                padding: EdgeInsets.symmetric(
+                                padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 3),
                                 child: Text(
                                   'Field Onboarder',
@@ -161,6 +157,16 @@ class AccountTab extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: _MenuCard(
                   entries: [
+                    _MenuEntry(Icons.person_outline_rounded, 'Profile',
+                        'Manage your personal details and social profiles.',
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                                builder: (_) => const ProfileScreen()))),
+                    _MenuEntry(Icons.info_outline_rounded, 'App Info',
+                        'App identity and release details.',
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                                builder: (_) => const AppInfoScreen()))),
                     _MenuEntry(
                       Icons.document_scanner_outlined,
                       'KYC verification',
@@ -180,7 +186,8 @@ class AccountTab extends StatelessWidget {
                           builder: (_) => InfoScreen(
                             title: 'Payout account',
                             icon: Icons.payments_outlined,
-                            description: 'Where your commission lands each cycle.',
+                            description:
+                                'Where your commission lands each cycle.',
                             bullets: [
                               'A Nigerian naira account is required.',
                               'Payouts run every Friday.',
@@ -245,7 +252,7 @@ class AccountTab extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  'MarketGO Onboarder v1.0.0 (build 1)',
+                  OnboarderApp.appName,
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -282,9 +289,10 @@ class AccountTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Icon(Icons.logout_rounded, size: 40, color: Color(0xFFEF4444)),
+            const Icon(Icons.logout_rounded,
+                size: 40, color: Color(0xFFEF4444)),
             const SizedBox(height: 14),
-            Text('Sign out of MarketGO?',
+            Text('Sign out of ${OnboarderApp.appName}?',
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 6),
             Text(
@@ -300,12 +308,14 @@ class AccountTab extends StatelessWidget {
               width: double.infinity,
               height: 52,
               child: FilledButton(
-                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444)),
                 onPressed: () {
                   Navigator.of(sheetContext).pop();
                   OnboarderSession.instance.logOut();
                   Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
+                    MaterialPageRoute<void>(
+                        builder: (_) => const LoginScreen()),
                     (route) => false,
                   );
                 },
@@ -357,7 +367,8 @@ class _StatsTile extends StatelessWidget {
           const SizedBox(height: 8),
           Text(value,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+              style:
+                  const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
           const SizedBox(height: 2),
           Text(label,
               style: const TextStyle(fontSize: 10.5, color: Color(0xFF6B7280))),
@@ -434,7 +445,8 @@ class _MenuCard extends StatelessWidget {
 }
 
 class _MenuEntry {
-  const _MenuEntry(this.icon, this.title, this.subtitle, {this.onTap, this.danger = false});
+  const _MenuEntry(this.icon, this.title, this.subtitle,
+      {this.onTap, this.danger = false});
 
   final IconData icon;
   final String title;

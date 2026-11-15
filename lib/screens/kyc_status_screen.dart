@@ -1,270 +1,208 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-
-import '../app.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../widgets/onboarder_app_bar.dart';
 
-/// Displays the onboarder's KYC review status and submitted documents.
+/// Identity and guarantor submission for the field onboarding account.
 class KYCStatusScreen extends StatefulWidget {
-  const KYCStatusScreen({super.key});
-
+  const KYCStatusScreen({super.key, this.onSubmitted});
+  final VoidCallback? onSubmitted;
   @override
   State<KYCStatusScreen> createState() => _KYCStatusScreenState();
 }
 
 class _KYCStatusScreenState extends State<KYCStatusScreen> {
-  bool _loading = true;
+  final _form = GlobalKey<FormState>();
+  final _api = ApiClient();
+  static const _labels = {
+    'nin': 'NIN (11 digits)',
+    'address': 'Residential address',
+    'phone': 'Phone number',
+    'guarantor_name': 'Guarantor full name',
+    'guarantor_phone': 'Guarantor phone number',
+    'guarantor_address': 'Guarantor residential address',
+    'guarantor_relationship': 'Relationship to guarantor',
+  };
+  final _fields = {
+    for (final key in _labels.keys) key: TextEditingController()
+  };
+  bool _loading = true, _saving = false, _uploading = false, _submitted = false;
   String? _error;
-  Map<String, dynamic>? _profile;
+  String _document = '';
+  Map<String, String> get _auth =>
+      {'Authorization': 'Bearer ${OnboarderSession.instance.accessToken}'};
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _load();
   }
 
-  Future<void> _loadProfile() async {
-    final token = OnboarderSession.instance.accessToken;
-    if (token == null) {
-      setState(() {
-        _loading = false;
-        _error = 'Sign in to view KYC status.';
-      });
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await _api.get('/api/v1/onboarder/profile', headers: _auth);
+      if (!mounted) return;
+      final kyc = data['profile']['kyc'];
+      if (kyc is Map) {
+        for (final key in _fields.keys) {
+          _fields[key]!.text = kyc[key]?.toString() ?? '';
+        }
+        _document = kyc['identity_card_url']?.toString() ?? '';
+        _submitted = true;
+      }
+    } catch (e) {
+      if (mounted) _error = '$e';
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _upload() async {
+    setState(() {
+      _uploading = true;
+      _error = null;
+    });
+    try {
+      final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+          withData: true);
+      if (result == null) return;
+      final file = result.files.single;
+      if (file.bytes == null || file.size > 10 * 1024 * 1024) {
+        throw const ApiException('Choose a document smaller than 10 MB.');
+      }
+      final url = await _api.uploadDocumentBytes(
+          file.bytes!, file.name, OnboarderSession.instance.accessToken!);
+      if (mounted) setState(() => _document = url);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    if (_document.isEmpty) {
+      setState(() => _error = 'Upload your identity document to continue.');
       return;
     }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
-      final api = ApiClient();
-      final data = await api.get('/api/v1/onboarder/profile',
-          headers: {'Authorization': 'Bearer $token'});
-      setState(() {
-        _profile = data['profile'];
-        _loading = false;
+      // Preserve the existing editable profile when submitting verification.
+      final data = await _api.get('/api/v1/onboarder/profile', headers: _auth);
+      final profile = Map<String, dynamic>.from(data['profile'] as Map);
+      await _api.put('/api/v1/onboarder/profile', headers: _auth, body: {
+        for (final key in [
+          'address',
+          'bio',
+          'instagram_handle',
+          'twitter_handle',
+          'linkedin_handle',
+          'facebook_handle',
+          'tiktok_handle'
+        ])
+          key: profile[key] ?? '',
+        'kyc': {
+          for (final entry in _fields.entries)
+            entry.key: entry.value.text.trim(),
+          'identity_card_url': _document
+        },
       });
+      if (!mounted) return;
+      setState(() => _submitted = true);
+      widget.onSubmitted?.call();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('KYC and guarantor details submitted.')));
     } catch (e) {
-      setState(() {
-        _error = 'Failed to load profile: $e';
-        _loading = false;
-      });
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('KYC Verification')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Status banner
-                  _buildStatusBanner(),
-                  const SizedBox(height: 24),
-
-                  // Submitted documents
-                  _sectionHeader('Onboarder Profile'),
-                  const SizedBox(height: 10),
-                  _buildInfoCard([
-                    _infoRow('Instagram', _profile?['instagram_handle'] ?? ''),
-                    _infoRow('Twitter/X', _profile?['twitter_handle'] ?? ''),
-                    _infoRow('LinkedIn', _profile?['linkedin_handle'] ?? ''),
-                    _infoRow('Facebook', _profile?['facebook_handle'] ?? ''),
-                    _infoRow('TikTok', _profile?['tiktok_handle'] ?? ''),
-                    _infoRow('Profile Photo',
-                        _profile?['profile_photo_url'] ?? 'Not uploaded'),
-                  ]),
-                  const SizedBox(height: 24),
-
-                  // KYC info
-                  _sectionHeader('About KYC Review'),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0F9FF),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFBAE6FD)),
+  Widget build(BuildContext context) => Scaffold(
+        appBar: const OnboarderAppBar(title: 'KYC & Guarantor'),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Form(
+                key: _form,
+                child: ListView(padding: const EdgeInsets.all(20), children: [
+                  Text(_submitted
+                      ? 'Your KYC and guarantor details have been submitted.'
+                      : 'Submit your identity and guarantor details to use the app.'),
+                  const SizedBox(height: 20),
+                  for (final entry in _fields.entries)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: TextFormField(
+                        controller: entry.value,
+                        enabled: !_saving && !_uploading,
+                        decoration:
+                            InputDecoration(labelText: _labels[entry.key]),
+                        keyboardType: entry.key == 'nin'
+                            ? TextInputType.number
+                            : entry.key.contains('phone')
+                                ? TextInputType.phone
+                                : TextInputType.text,
+                        validator: (value) {
+                          final text = value?.trim() ?? '';
+                          if (text.isEmpty) return 'This field is required.';
+                          if (entry.key == 'nin' &&
+                              !RegExp(r'^\d{11}$').hasMatch(text)) {
+                            return 'Enter an 11-digit NIN.';
+                          }
+                          if (entry.key.contains('phone') &&
+                              !RegExp(r'^\+?[0-9 ()-]{10,20}$')
+                                  .hasMatch(text)) {
+                            return 'Enter a valid phone number.';
+                          }
+                          return null;
+                        },
+                      ),
                     ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _BulletItem('KYC documents are reviewed within 2 business days.'),
-                        _BulletItem('You will be notified once your documents are verified.'),
-                        _BulletItem('Verified onboarders unlock full commission payouts.'),
-                        _BulletItem(
-                            'Ensure all documents are clear and legible before submitting.'),
-                      ],
-                    ),
-                  ),
+                  OutlinedButton.icon(
+                      onPressed: _saving || _uploading ? null : _upload,
+                      icon: const Icon(Icons.upload_file),
+                      label: Text(_uploading
+                          ? 'Uploading…'
+                          : _document.isEmpty
+                              ? 'Upload identity document'
+                              : 'Replace identity document')),
+                  if (_document.isNotEmpty)
+                    const Text('Identity document uploaded.'),
                   if (_error != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDECEC),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: Color(0xFF8F1D16),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
+                    Text(_error!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error)),
+                    TextButton(
+                        onPressed: _loading || _saving ? null : _load,
+                        child: const Text('Reload'))
                   ],
-                ],
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                      onPressed: _saving || _uploading ? null : _submit,
+                      child: Text(
+                          _saving ? 'Submitting…' : 'Submit KYC & guarantor')),
+                ]),
               ),
-            ),
-    );
-  }
-
-  Widget _buildStatusBanner() {
-    final status = _profile?['kyc_status'] ?? 'pending';
-    Color bgColor;
-    Color textColor;
-    IconData icon;
-    String label;
-    String desc;
-
-    switch (status) {
-      case 'approved':
-        bgColor = const Color(0xFFDCFCE7);
-        textColor = const Color(0xFF166534);
-        icon = Icons.check_circle_rounded;
-        label = 'Verified';
-        desc = 'Your profile has been verified. Full payouts are unlocked.';
-        break;
-      case 'rejected':
-        bgColor = const Color(0xFFFDECEC);
-        textColor = const Color(0xFF8F1D16);
-        icon = Icons.cancel_rounded;
-        label = 'Rejected';
-        desc = _profile?['kyc_rejection_reason']?.isNotEmpty == true
-            ? _profile!['kyc_rejection_reason']
-            : 'Your documents were rejected. Please update and resubmit.';
-        break;
-      case 'under_review':
-        bgColor = const Color(0xFFEFF6FF);
-        textColor = const Color(0xFF1E40AF);
-        icon = Icons.hourglass_top_rounded;
-        label = 'Under Review';
-        desc = 'Your documents are being reviewed. This usually takes 1-2 business days.';
-        break;
-      default:
-        bgColor = const Color(0xFFFFFBEB);
-        textColor = const Color(0xFF92400E);
-        icon = Icons.info_outline_rounded;
-        label = 'Pending';
-        desc = 'Submit your KYC documents to get verified and unlock full payouts.';
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: textColor, size: 28),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                        color: textColor)),
-                const SizedBox(height: 4),
-                Text(desc,
-                    style:
-                        TextStyle(fontSize: 13, color: textColor, height: 1.4)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _sectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        color: Color(0xFF0D9488),
-        letterSpacing: 0.3,
-      ),
-    );
-  }
-
-  Widget _buildInfoCard(List<Widget> children) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: OnboarderApp.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAF0EE)),
-      ),
-      child: Column(children: children),
-    );
-  }
-
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B7280))),
-          ),
-          Expanded(
-            child: Text(
-              value.isEmpty ? 'Not provided' : value,
-              style: TextStyle(
-                fontSize: 13,
-                color: value.isEmpty ? const Color(0xFF9CA3AF) : OnboarderApp.ink,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BulletItem extends StatelessWidget {
-  const _BulletItem(this.text);
-  final String text;
+      );
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('  \u2022  ',
-              style: TextStyle(color: Color(0xFF0D9488), fontWeight: FontWeight.w800)),
-          Expanded(
-            child: Text(text,
-                style:
-                    const TextStyle(fontSize: 13, color: Color(0xFF1E3A5F), height: 1.4)),
-          ),
-        ],
-      ),
-    );
+  void dispose() {
+    for (final field in _fields.values) {
+      field.dispose();
+    }
+    super.dispose();
   }
 }

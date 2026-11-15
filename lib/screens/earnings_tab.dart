@@ -4,6 +4,7 @@ import '../app.dart';
 import '../models/onboarding.dart';
 import '../services/onboard_service.dart';
 import '../widgets/common.dart';
+import 'withdrawal_screen.dart';
 
 class EarningsTab extends StatelessWidget {
   const EarningsTab({super.key});
@@ -51,10 +52,11 @@ class EarningsTab extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Available balance',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: const Color(0xFF6B7280),
-                                fontWeight: FontWeight.w600,
-                              )),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: const Color(0xFF6B7280),
+                                    fontWeight: FontWeight.w600,
+                                  )),
                       const SizedBox(height: 4),
                       PriceText(repo.totalEarned, size: 32),
                       const SizedBox(height: 14),
@@ -89,10 +91,9 @@ class EarningsTab extends StatelessWidget {
                         width: double.infinity,
                         height: 50,
                         child: TextButton(
-                          onPressed: () => ScaffoldMessenger.of(context)
-                              .showSnackBar(
-                            const SnackBar(
-                              content: Text('Payout will be processed shortly.'),
+                          onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const WithdrawalScreen(),
                             ),
                           ),
                           child: const Text('Request payout'),
@@ -104,7 +105,8 @@ class EarningsTab extends StatelessWidget {
               ),
             ),
             const SliverToBoxAdapter(child: _HowItWorks()),
-            const SliverToBoxAdapter(child: SectionHeader('Recent transactions')),
+            const SliverToBoxAdapter(
+                child: SectionHeader('Recent transactions')),
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (context, i) {
@@ -133,7 +135,7 @@ class _BalanceFact extends StatelessWidget {
   });
 
   final String label;
-  final int value;
+  final num value;
   final Color color;
 
   @override
@@ -145,7 +147,8 @@ class _BalanceFact extends StatelessWidget {
         const SizedBox(height: 6),
         PriceText(value, size: 14),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280))),
       ],
     );
   }
@@ -226,9 +229,18 @@ class _TxnRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color color, IconData icon) = switch (txn.kind) {
-      CommissionKind.vendor => (OnboarderApp.brandTeal, Icons.storefront_rounded),
-      CommissionKind.rider => (const Color(0xFF2563EB), Icons.two_wheeler_rounded),
-      CommissionKind.mover => (const Color(0xFFEA580C), Icons.local_shipping_rounded),
+      CommissionKind.vendor => (
+          OnboarderApp.brandTeal,
+          Icons.storefront_rounded
+        ),
+      CommissionKind.rider => (
+          const Color(0xFF2563EB),
+          Icons.two_wheeler_rounded
+        ),
+      CommissionKind.mover => (
+          const Color(0xFFEA580C),
+          Icons.local_shipping_rounded
+        ),
       CommissionKind.fee => (const Color(0xFFD97706), Icons.savings_rounded),
     };
     return Container(

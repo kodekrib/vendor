@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../services/auth_service.dart';
 import '../services/payment_service.dart';
+import '../widgets/onboarder_app_bar.dart';
 
 class BankAccountScreen extends StatefulWidget {
   const BankAccountScreen({super.key});
@@ -121,7 +122,7 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Bank Accounts')),
+      appBar: const OnboarderAppBar(title: 'Bank Accounts'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -154,13 +155,16 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: OnboarderApp.brandTealLight,
-                              child: Icon(Icons.account_balance, color: OnboarderApp.brandTealDark),
+                              child: Icon(Icons.account_balance,
+                                  color: OnboarderApp.brandTealDark),
                             ),
                             title: Text(w['bank_name'] ?? ''),
-                            subtitle: Text('${w['account_name']}\n${w['account_number']}'),
+                            subtitle: Text(
+                                '${w['account_name']}\n${w['account_number']}'),
                             isThreeLine: true,
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              icon: const Icon(Icons.delete_outline,
+                                  color: Colors.red),
                               onPressed: () => _deleteWallet(w['id']),
                             ),
                           ),
@@ -194,7 +198,8 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
               items: _banks
                   .map((b) => DropdownMenuItem(
                         value: b,
-                        child: Text(b['name']!, overflow: TextOverflow.ellipsis),
+                        child:
+                            Text(b['name']!, overflow: TextOverflow.ellipsis),
                       ))
                   .toList(),
               onChanged: (b) => setState(() {
@@ -242,14 +247,19 @@ class _BankAccountScreenState extends State<BankAccountScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green.shade600, size: 20),
+                    Icon(Icons.check_circle,
+                        color: Colors.green.shade600, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(_resolvedName!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(_accountController.text, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                          Text(_resolvedName!,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(_accountController.text,
+                              style: TextStyle(
+                                  color: Colors.grey[600], fontSize: 13)),
                         ],
                       ),
                     ),

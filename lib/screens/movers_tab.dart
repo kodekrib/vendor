@@ -63,7 +63,8 @@ class MoversTab extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, i) {
                   final m = repo.movers[i];
-                  return _MoverCard(mover: m, last: i == repo.movers.length - 1);
+                  return _MoverCard(
+                      mover: m, last: i == repo.movers.length - 1);
                 },
                 childCount: repo.movers.length,
               ),
@@ -150,14 +151,14 @@ class _MoverCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Row(
+                const Row(
                   children: [
-                    const Icon(Icons.trending_up_rounded,
+                    Icon(Icons.trending_up_rounded,
                         size: 18, color: Color(0xFF16A34A)),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
-                      '${mover.commissionRate}% your share',
-                      style: const TextStyle(
+                      'Admin-set share',
+                      style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF16A34A),

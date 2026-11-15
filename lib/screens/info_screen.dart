@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app.dart';
+import '../widgets/onboarder_app_bar.dart';
 
 /// Simple placeholder detail screen for the onboarder's account menu items.
 class InfoScreen extends StatelessWidget {
@@ -21,11 +22,7 @@ class InfoScreen extends StatelessWidget {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: OnboarderApp.surfaceMuted,
-      appBar: AppBar(
-        backgroundColor: OnboarderApp.surfaceMuted,
-        surfaceTintColor: Colors.transparent,
-        title: Text(title),
-      ),
+      appBar: OnboarderAppBar(title: title),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         child: Column(
@@ -53,7 +50,8 @@ class InfoScreen extends StatelessWidget {
                       Icon(Icons.check_circle_rounded,
                           size: 18, color: OnboarderApp.brandTealDark),
                       const SizedBox(width: 10),
-                      Expanded(child: Text(b, style: theme.textTheme.bodyMedium)),
+                      Expanded(
+                          child: Text(b, style: theme.textTheme.bodyMedium)),
                     ],
                   ),
                 ),

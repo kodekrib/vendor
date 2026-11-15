@@ -1,9 +1,11 @@
+import 'app_info_screen.dart';
 import 'package:flutter/material.dart';
 import '../app.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/settings_service.dart';
 import '../widgets/route_animation.dart';
+import '../widgets/skeuo.dart';
 import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import 'mfa_screen.dart';
@@ -30,14 +32,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _keepSignedIn = true;
   bool _loading = false;
   String? _error;
-  AppSettings? _settings;
 
   @override
   void initState() {
     super.initState();
-    SettingsService.fetchSettings().then((s) {
-      if (mounted) setState(() => _settings = s);
-    });
+    SettingsService.fetchSettings();
   }
 
   @override
@@ -81,7 +80,8 @@ class _LoginScreenState extends State<LoginScreen> {
               email: email,
               onVerified: () {
                 nav.pushAndRemoveUntil(
-                  MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
+                  MaterialPageRoute<void>(
+                      builder: (_) => const OnboarderHome()),
                   (route) => false,
                 );
               },
@@ -90,38 +90,13 @@ class _LoginScreenState extends State<LoginScreen> {
         );
         return;
       }
-if (result) {
-      // Check if the vendor is active; if disabled, show a blocked screen
-      final isVendor = OnboarderSession.instance.user?.role == 'vendor';
-      if (isVendor) {
-        final api = ApiClient();
-        try {
-          final data = await api.get('/api/v1/vendor/me',
-              headers: {'Authorization': 'Bearer ${OnboarderSession.instance.accessToken}'});
-          if (data['is_active'] == false) {
-            // Vendor is disabled — show a blocked state instead of home
-            if (!mounted) return;
-            setState(() {
-              _loading = false;
-              _error = 'Your vendor account has been disabled. Contact the administrator.';
-            });
-            return;
-          }
-        } catch (e) {
-          if (!mounted) return;
-          setState(() {
-            _loading = false;
-            _error = e is ApiException ? e.message : 'Unable to verify vendor account status.';
-          });
-          return;
-        }
+      if (result) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
+        );
+        return;
       }
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const OnboarderHome()),
-      );
-      return;
-    }
       setState(() {
         _loading = false;
         _error = 'Invalid credentials or login failed.';
@@ -136,8 +111,6 @@ if (result) {
       return;
     }
   }
-
-
 
   /// Opens the phone/OTP sign-in flow. The OTP screen verifies the code with
   /// the backend and enters the authenticated session before navigating on.
@@ -158,13 +131,23 @@ if (result) {
     );
   }
 
-
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<AppSettings>(
+      valueListenable: SettingsService.current,
+      builder: (context, _, __) => _buildContent(context));
+
+  Widget _buildContent(BuildContext context) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
     return Scaffold(
+      floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
+      floatingActionButton: SafeArea(
+          child: IconButton.filledTonal(
+              tooltip: 'App Info',
+              onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                      builder: (_) => const AppInfoScreen())),
+              icon: const Icon(Icons.info_outline_rounded))),
       backgroundColor: OnboarderApp.surfaceMuted,
       body: Stack(
         children: [
@@ -173,7 +156,7 @@ if (result) {
             left: 0,
             right: 0,
             height: size.height * 0.46,
-            child: const _HeroBand(markIcon: Icons.handshake_rounded),
+            child: const _HeroBand(),
           ),
           SafeArea(
             child: SingleChildScrollView(
@@ -182,8 +165,8 @@ if (result) {
               child: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     child: Row(
                       children: [
                         IconButton(
@@ -197,7 +180,7 @@ if (result) {
                     ),
                   ),
                   SizedBox(height: size.height * 0.10),
-                  _HeroContent(settings: _settings),
+                  const _HeroContent(),
                   const SizedBox(height: 28),
                   Container(
                     width: size.width,
@@ -211,26 +194,31 @@ if (result) {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _LoginCard(
-                          emailController: _emailController,
-                          passwordController: _passwordController,
-                          obscure: _obscure,
-                          onToggleObscure: () =>
-                              setState(() => _obscure = !_obscure),
-                          keepSignedIn: _keepSignedIn,
-                          onToggleKeep: (v) =>
-                              setState(() => _keepSignedIn = v),
-                          error: _error,
-                          loading: _loading,
-                          onSignIn: _signIn,
-                          onOpenOtp: _openOtp,
-                          appName: _settings?.appName ?? 'MarketGO',
+                        SkeuoCard(
+                          radius: 24,
+                          padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+                          child: _LoginCard(
+                            emailController: _emailController,
+                            passwordController: _passwordController,
+                            obscure: _obscure,
+                            onToggleObscure: () =>
+                                setState(() => _obscure = !_obscure),
+                            keepSignedIn: _keepSignedIn,
+                            onToggleKeep: (v) =>
+                                setState(() => _keepSignedIn = v),
+                            error: _error,
+                            loading: _loading,
+                            onSignIn: _signIn,
+                            onOpenOtp: _openOtp,
+                            appName: SettingsService.current.value.appName,
+                          ),
                         ),
                         const SizedBox(height: 18),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('New to MarketGO?',
+                            Text(
+                                'New to ${SettingsService.current.value.appName}?',
                                 style: theme.textTheme.bodyMedium),
                             TextButton(
                               onPressed: () => Navigator.of(context).push(
@@ -256,38 +244,36 @@ if (result) {
 }
 
 class _HeroBand extends StatelessWidget {
-  const _HeroBand({required this.markIcon});
-
-  final IconData markIcon;
+  const _HeroBand();
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0F3D3A), Color(0xFF0D9488)],
+          colors: [
+            OnboarderApp.brandTealDark,
+            Theme.of(context).colorScheme.primary
+          ],
         ),
       ),
-      child: AnimatedRouteBackdrop(markIcon: markIcon),
+      child: const AnimatedRouteBackdrop(markIcon: Icons.moped_rounded),
     );
   }
 }
 
 class _HeroContent extends StatelessWidget {
-  const _HeroContent({required this.settings});
-
-  final AppSettings? settings;
+  const _HeroContent();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return const Column(
       children: [
-        _BrandTile(settings: settings),
-        const SizedBox(height: 20),
-        const Text(
-          'Field onboarding, done right',
+        SizedBox(height: 80),
+        Text(
+          'Grow Together',
           style: TextStyle(
             color: Colors.white,
             fontSize: 28,
@@ -295,56 +281,17 @@ class _HeroContent extends StatelessWidget {
             letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(height: 8),
-        const Padding(
+        SizedBox(height: 8),
+        Padding(
           padding: EdgeInsets.symmetric(horizontal: 40),
           child: Text(
             'Onboard vendors and riders on the go. Earn commission from every account you open.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 15, height: 1.5),
+            textAlign: TextAlign.center,
+            style:
+                TextStyle(color: Color(0xB3FFFFFF), fontSize: 15, height: 1.5),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _BrandTile extends StatelessWidget {
-  const _BrandTile({required this.settings});
-
-  final AppSettings? settings;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 88,
-      height: 88,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.20),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      child: settings?.logoUrl.isNotEmpty == true
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(26),
-              child: Image.network(
-                settings!.logoUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Icon(
-                  Icons.handshake_rounded,
-                  size: 52,
-                  color: OnboarderApp.brandTeal,
-                ),
-              ),
-            )
-          : Icon(Icons.handshake_rounded,
-              size: 52, color: OnboarderApp.brandTeal),
     );
   }
 }
@@ -407,44 +354,36 @@ class _LoginCard extends StatelessWidget {
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
-
-        const SizedBox(height: 16),
-
-        TextField(
+        SkeuoField(
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
-          autofillHints: const [AutofillHints.email],
           onSubmitted: (_) => FocusScope.of(context).nextFocus(),
-          decoration: const InputDecoration(
-            labelText: 'Email address',
-            hintText: 'you@marketgo.com',
-            prefixIcon: Icon(Icons.mail_outline_rounded),
-          ),
+          accent: OnboarderApp.brandTeal,
+          label: 'Email address',
+          hint: 'you@marketgo.com',
+          prefixIcon: const Icon(Icons.mail_outline_rounded),
         ),
         const SizedBox(height: 14),
-        TextField(
+        SkeuoField(
           controller: passwordController,
           obscureText: obscure,
           textInputAction: TextInputAction.done,
-          autofillHints: const [AutofillHints.password],
           onSubmitted: (_) => onSignIn(),
-          decoration: InputDecoration(
-            labelText: 'Password',
-            hintText: '••••••••',
-            prefixIcon: const Icon(Icons.lock_outline_rounded),
-            suffixIcon: IconButton(
-              onPressed: onToggleObscure,
-              icon: Icon(
-                obscure
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-              ),
-              tooltip: obscure ? 'Show password' : 'Hide password',
+          accent: OnboarderApp.brandTeal,
+          label: 'Password',
+          hint: '••••••••',
+          prefixIcon: const Icon(Icons.lock_outline_rounded),
+          suffixIcon: IconButton(
+            onPressed: onToggleObscure,
+            icon: Icon(
+              obscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
             ),
+            tooltip: obscure ? 'Show password' : 'Hide password',
           ),
         ),
-
         if (error != null) ...[
           const SizedBox(height: 12),
           Container(
@@ -452,6 +391,7 @@ class _LoginCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFFFDECEC),
               borderRadius: BorderRadius.circular(12),
+              boxShadow: Skeuo.insetShadows(tint: const Color(0xFF8F1D16)),
             ),
             child: Row(
               children: [
@@ -472,7 +412,6 @@ class _LoginCard extends StatelessWidget {
             ),
           ),
         ],
-
         const SizedBox(height: 8),
         Row(
           children: [
@@ -483,60 +422,37 @@ class _LoginCard extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Expanded(
-              child: Text('Keep me signed in', style: theme.textTheme.bodyMedium),
+              child:
+                  Text('Keep me signed in', style: theme.textTheme.bodyMedium),
             ),
           ],
         ),
         const SizedBox(height: 6),
-
-        SizedBox(
-          height: 54,
-          child: ElevatedButton(
-            onPressed: loading ? null : onSignIn,
-            child: loading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.6,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Sign in'),
-          ),
+        SkeuoButton(
+          label: 'Sign in',
+          icon: Icons.login_rounded,
+          color: OnboarderApp.brandTeal,
+          height: 56,
+          loading: loading,
+          onPressed: loading ? null : onSignIn,
         ),
-
         const SizedBox(height: 20),
         Row(
           children: [
             const Expanded(child: Divider()),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text('or continue with', style: theme.textTheme.bodyMedium),
+              child:
+                  Text('or continue with', style: theme.textTheme.bodyMedium),
             ),
             const Expanded(child: Divider()),
           ],
         ),
         const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Expanded(
-              child: _OutlineAction(
-                icon: Icons.phone_iphone_rounded,
-                label: 'Phone',
-                onTap: onOpenOtp,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _OutlineAction(
-                icon: Icons.mark_email_read_outlined,
-                label: 'OTP',
-                onTap: onOpenOtp,
-              ),
-            ),
-          ],
+        _OutlineAction(
+          icon: Icons.phone_iphone_rounded,
+          label: 'Phone',
+          onTap: onOpenOtp,
         ),
       ],
     );
@@ -556,23 +472,15 @@ class _OutlineAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
+    return SkeuoButton(
+      label: label,
+      icon: icon,
+      color: Colors.white,
+      textColor: OnboarderApp.ink,
+      iconColor: OnboarderApp.brandTealDark,
+      height: 52,
+      radius: 14,
       onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(50),
-        side: const BorderSide(color: Color(0xFFD5DAE1)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        foregroundColor: OnboarderApp.ink,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 18, color: OnboarderApp.brandTealDark),
-          const SizedBox(width: 8),
-          Text(label),
-        ],
-      ),
     );
   }
 }

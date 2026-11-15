@@ -63,7 +63,8 @@ class VendorsTab extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, i) {
                   final v = repo.vendors[i];
-                  return _VendorCard(vendor: v, last: i == repo.vendors.length - 1);
+                  return _VendorCard(
+                      vendor: v, last: i == repo.vendors.length - 1);
                 },
                 childCount: repo.vendors.length,
               ),
@@ -115,8 +116,8 @@ class _VendorCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(vendor.storeName,
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 15)),
                       const SizedBox(height: 2),
                       Text(
                         '${vendor.ownerName} · ${vendor.category}',
@@ -187,8 +188,8 @@ class _VendorFact extends StatelessWidget {
         const SizedBox(width: 4),
         Flexible(
           child: Text(text,
-              style: const TextStyle(
-                  fontSize: 12.5, fontWeight: FontWeight.w600)),
+              style:
+                  const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
         ),
       ],
     );

@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../models/onboarding.dart';
 import '../services/onboard_service.dart';
+import '../widgets/animated_3d.dart';
 import '../widgets/common.dart';
+import '../widgets/skeuo.dart';
 import 'onboard_rider_screen.dart';
+import 'onboard_mover_screen.dart';
 import 'onboard_vendor_screen.dart';
 
 class DashboardTab extends StatelessWidget {
@@ -23,20 +26,36 @@ class DashboardTab extends StatelessWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      'Welcome back, $name',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                    Floating3DHero(
+                      icon: Icons.storefront_rounded,
+                      size: 30,
+                      front: OnboarderApp.brandTeal,
+                      side: OnboarderApp.brandTealDark,
+                      depth: 1.8,
+                      layers: 5,
+                      period: const Duration(seconds: 5),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${repo.activeVendors} active vendors · ${repo.activeRiders} active riders',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: const Color(0xFF6B7280)),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Welcome back, $name',
+                            style: Theme.of(context).textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${repo.activeVendors} active vendors · ${repo.activeRiders} active riders',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: const Color(0xFF6B7280)),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -83,12 +102,18 @@ class DashboardTab extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF0F3D3A), Color(0xFF0D9488)],
+                      colors: [
+                        OnboarderApp.brandTealDark,
+                        Theme.of(context).colorScheme.primary
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0x33000000)),
+                    boxShadow: Skeuo.raisedShadows(
+                        depth: 0.9, tint: OnboarderApp.brandTealDark),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,8 +151,8 @@ class DashboardTab extends StatelessWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
             const SliverToBoxAdapter(child: _QuickActions()),
             SliverToBoxAdapter(
-              child: SectionHeader('Recent activity', action: 'Earnings',
-                  onAction: () {}),
+              child: SectionHeader('Recent activity',
+                  action: 'Earnings', onAction: () {}),
             ),
             SliverList(
               delegate: SliverChildBuilderDelegate(
@@ -184,6 +209,16 @@ class _QuickActions extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          _QuickActionTile(
+            icon: Icons.local_shipping_rounded,
+            color: const Color(0xFFEA580C),
+            label: 'Onboard mover',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                  builder: (_) => const OnboardMoverScreen()),
+            ),
+          ),
         ],
       ),
     );
@@ -205,21 +240,19 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SkeuoCard(
+      radius: 18,
+      depth: 0.7,
+      color: OnboarderApp.surface,
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: OnboarderApp.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFEAF0EE)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: iconColor, size: 22),
           const SizedBox(height: 10),
           Text(value,
-              style: const TextStyle(
-                  fontSize: 22, fontWeight: FontWeight.w900)),
+              style:
+                  const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
           const SizedBox(height: 2),
           Text(label,
               style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
@@ -244,26 +277,34 @@ class _QuickActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return SkeuoCard(
+      radius: 18,
+      depth: 0.7,
+      color: Skeuo.shade(color, 0.90),
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.10),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color.withOpacity(0.25)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 12),
-            Text(label,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 14)),
-          ],
-        ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Skeuo.shade(color, 0.30), Skeuo.shade(color, -0.12)],
+              ),
+              boxShadow: Skeuo.raisedShadows(depth: 0.35, tint: color),
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(height: 12),
+          Text(label,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+        ],
       ),
     );
   }
@@ -278,19 +319,26 @@ class _TxnTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (Color color, IconData icon) = switch (txn.kind) {
-      CommissionKind.vendor => (OnboarderApp.brandTeal, Icons.storefront_rounded),
-      CommissionKind.rider => (const Color(0xFF2563EB), Icons.two_wheeler_rounded),
-      CommissionKind.mover => (const Color(0xFFEA580C), Icons.local_shipping_rounded),
+      CommissionKind.vendor => (
+          OnboarderApp.brandTeal,
+          Icons.storefront_rounded
+        ),
+      CommissionKind.rider => (
+          const Color(0xFF2563EB),
+          Icons.two_wheeler_rounded
+        ),
+      CommissionKind.mover => (
+          const Color(0xFFEA580C),
+          Icons.local_shipping_rounded
+        ),
       CommissionKind.fee => (const Color(0xFFD97706), Icons.savings_rounded),
     };
-    return Container(
-      margin: EdgeInsets.fromLTRB(20, last ? 4 : 4, 20, last ? 12 : 0),
+    return SkeuoCard(
+      radius: 16,
+      depth: 0.6,
+      color: OnboarderApp.surface,
+      margin: EdgeInsets.fromLTRB(20, 4, 20, last ? 12 : 0),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: OnboarderApp.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAF0EE)),
-      ),
       child: Row(
         children: [
           AccountAvatar(icon: icon, color: color, size: 44),

@@ -63,7 +63,8 @@ class RidersTab extends StatelessWidget {
               delegate: SliverChildBuilderDelegate(
                 (context, i) {
                   final r = repo.riders[i];
-                  return _RiderCard(rider: r, last: i == repo.riders.length - 1);
+                  return _RiderCard(
+                      rider: r, last: i == repo.riders.length - 1);
                 },
                 childCount: repo.riders.length,
               ),

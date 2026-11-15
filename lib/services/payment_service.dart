@@ -3,6 +3,11 @@ import 'api_client.dart';
 class PaymentService {
   PaymentService({ApiClient? api}) : api = api ?? ApiClient();
   final ApiClient api;
+  Future<Map<String, dynamic>> balance(String token) async {
+    final data =
+        await api.get('/api/v1/onboarder/balance', headers: _auth(token));
+    return Map<String, dynamic>.from(data['balance'] as Map);
+  }
 
   Map<String, String> _auth(String token) => {
         'Authorization': 'Bearer $token',
@@ -11,7 +16,8 @@ class PaymentService {
   Future<List<Map<String, dynamic>>> listBanks() async {
     final data = await api.get('/api/v1/banks');
     return (data['banks'] as List<dynamic>? ?? [])
-        .map((b) => {'name': b['name'].toString(), 'code': b['code'].toString()})
+        .map(
+            (b) => {'name': b['name'].toString(), 'code': b['code'].toString()})
         .toList();
   }
 
@@ -52,7 +58,8 @@ class PaymentService {
   }
 
   Future<List<Map<String, dynamic>>> listWallets(String token) async {
-    final data = await api.get('/api/v1/onboarder/wallets', headers: _auth(token));
+    final data =
+        await api.get('/api/v1/onboarder/wallets', headers: _auth(token));
     return (data['wallets'] as List<dynamic>? ?? [])
         .map((w) => Map<String, dynamic>.from(w))
         .toList();
@@ -75,7 +82,8 @@ class PaymentService {
   }
 
   Future<List<Map<String, dynamic>>> listWithdrawals(String token) async {
-    final data = await api.get('/api/v1/onboarder/withdrawals', headers: _auth(token));
+    final data =
+        await api.get('/api/v1/onboarder/withdrawals', headers: _auth(token));
     return (data['withdrawals'] as List<dynamic>? ?? [])
         .map((w) => Map<String, dynamic>.from(w))
         .toList();
