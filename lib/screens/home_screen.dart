@@ -44,7 +44,12 @@ class _OnboarderHomeState extends State<OnboarderHome> {
       if (token == null) throw const ApiException('Sign in to continue.');
       final data = await ApiClient().get('/api/v1/onboarder/profile',
           headers: {'Authorization': 'Bearer $token'});
-      final submitted = data['profile']['kyc'] is Map;
+      final verification = await ApiClient().get('/api/v1/verification/status',
+          headers: {'Authorization': 'Bearer $token'});
+      final checks = verification['checks'] as List;
+      final submitted = data['profile']['kyc'] is Map &&
+          checks
+              .every((c) => c['required'] != true || c['status'] == 'verified');
       if (submitted) await OnboardService.instance.connect(token);
       if (mounted) setState(() => _submitted = submitted);
     } catch (e) {

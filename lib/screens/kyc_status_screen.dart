@@ -1,8 +1,8 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../widgets/onboarder_app_bar.dart';
+import '../widgets/provider_verification.dart';
 
 /// Identity and guarantor submission for the field onboarding account.
 class KYCStatusScreen extends StatefulWidget {
@@ -16,7 +16,6 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
   final _form = GlobalKey<FormState>();
   final _api = ApiClient();
   static const _labels = {
-    'nin': 'NIN (11 digits)',
     'address': 'Residential address',
     'phone': 'Phone number',
     'guarantor_name': 'Guarantor full name',
@@ -27,9 +26,8 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
   final _fields = {
     for (final key in _labels.keys) key: TextEditingController()
   };
-  bool _loading = true, _saving = false, _uploading = false, _submitted = false;
+  bool _loading = true, _saving = false, _submitted = false;
   String? _error;
-  String _document = '';
   Map<String, String> get _auth =>
       {'Authorization': 'Bearer ${OnboarderSession.instance.accessToken}'};
 
@@ -52,7 +50,6 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
         for (final key in _fields.keys) {
           _fields[key]!.text = kyc[key]?.toString() ?? '';
         }
-        _document = kyc['identity_card_url']?.toString() ?? '';
         _submitted = true;
       }
     } catch (e) {
@@ -62,37 +59,8 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
     }
   }
 
-  Future<void> _upload() async {
-    setState(() {
-      _uploading = true;
-      _error = null;
-    });
-    try {
-      final result = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
-          withData: true);
-      if (result == null) return;
-      final file = result.files.single;
-      if (file.bytes == null || file.size > 10 * 1024 * 1024) {
-        throw const ApiException('Choose a document smaller than 10 MB.');
-      }
-      final url = await _api.uploadDocumentBytes(
-          file.bytes!, file.name, OnboarderSession.instance.accessToken!);
-      if (mounted) setState(() => _document = url);
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
-  }
-
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
-    if (_document.isEmpty) {
-      setState(() => _error = 'Upload your identity document to continue.');
-      return;
-    }
     setState(() {
       _saving = true;
       _error = null;
@@ -114,8 +82,7 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
           key: profile[key] ?? '',
         'kyc': {
           for (final entry in _fields.entries)
-            entry.key: entry.value.text.trim(),
-          'identity_card_url': _document
+            entry.key: entry.value.text.trim()
         },
       });
       if (!mounted) return;
@@ -138,6 +105,9 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
             : Form(
                 key: _form,
                 child: ListView(padding: const EdgeInsets.all(20), children: [
+                  ProviderVerification(
+                      api: _api,
+                      token: () => OnboarderSession.instance.accessToken),
                   Text(_submitted
                       ? 'Your KYC and guarantor details have been submitted.'
                       : 'Submit your identity and guarantor details to use the app.'),
@@ -147,21 +117,15 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
                       padding: const EdgeInsets.only(bottom: 16),
                       child: TextFormField(
                         controller: entry.value,
-                        enabled: !_saving && !_uploading,
+                        enabled: !_saving,
                         decoration:
                             InputDecoration(labelText: _labels[entry.key]),
-                        keyboardType: entry.key == 'nin'
-                            ? TextInputType.number
-                            : entry.key.contains('phone')
-                                ? TextInputType.phone
-                                : TextInputType.text,
+                        keyboardType: entry.key.contains('phone')
+                            ? TextInputType.phone
+                            : TextInputType.text,
                         validator: (value) {
                           final text = value?.trim() ?? '';
                           if (text.isEmpty) return 'This field is required.';
-                          if (entry.key == 'nin' &&
-                              !RegExp(r'^\d{11}$').hasMatch(text)) {
-                            return 'Enter an 11-digit NIN.';
-                          }
                           if (entry.key.contains('phone') &&
                               !RegExp(r'^\+?[0-9 ()-]{10,20}$')
                                   .hasMatch(text)) {
@@ -171,16 +135,6 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
                         },
                       ),
                     ),
-                  OutlinedButton.icon(
-                      onPressed: _saving || _uploading ? null : _upload,
-                      icon: const Icon(Icons.upload_file),
-                      label: Text(_uploading
-                          ? 'Uploading…'
-                          : _document.isEmpty
-                              ? 'Upload identity document'
-                              : 'Replace identity document')),
-                  if (_document.isNotEmpty)
-                    const Text('Identity document uploaded.'),
                   if (_error != null) ...[
                     Text(_error!,
                         style: TextStyle(
@@ -191,7 +145,7 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
                   ],
                   const SizedBox(height: 20),
                   ElevatedButton(
-                      onPressed: _saving || _uploading ? null : _submit,
+                      onPressed: _saving ? null : _submit,
                       child: Text(
                           _saving ? 'Submitting…' : 'Submit KYC & guarantor')),
                 ]),
