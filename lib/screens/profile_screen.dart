@@ -158,6 +158,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             for (final key in ['name', 'email']) _field(key),
                             TextFormField(
                                 initialValue: _profile!.value('phone'),
+                                keyboardType: TextInputType.phone,
                                 readOnly: true,
                                 decoration: const InputDecoration(
                                     labelText: 'Sign-in phone number',
@@ -196,9 +197,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
               : key == 'address'
                   ? 500
                   : 255,
-          maxLines: key == 'bio' ? 3 : 1,
-          keyboardType:
-              key == 'email' ? TextInputType.emailAddress : TextInputType.text,
+          minLines: key == 'address' || key == 'bio' ? 3 : 1,
+          maxLines: key == 'address' || key == 'bio' ? 5 : 1,
+          keyboardType: key == 'email'
+              ? TextInputType.emailAddress
+              : key == 'address' || key == 'bio'
+                  ? TextInputType.multiline
+                  : TextInputType.text,
+          textInputAction: key == 'address' || key == 'bio'
+              ? TextInputAction.newline
+              : TextInputAction.next,
+          textCapitalization: key == 'email' || key.endsWith('_handle')
+              ? TextCapitalization.none
+              : key == 'name'
+                  ? TextCapitalization.words
+                  : TextCapitalization.sentences,
+          autocorrect: key != 'email' && !key.endsWith('_handle'),
           validator: (value) {
             if (['name', 'email'].contains(key) &&
                 (value?.trim().isEmpty ?? true)) {

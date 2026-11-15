@@ -122,7 +122,20 @@ class _KYCStatusScreenState extends State<KYCStatusScreen> {
                             InputDecoration(labelText: _labels[entry.key]),
                         keyboardType: entry.key.contains('phone')
                             ? TextInputType.phone
-                            : TextInputType.text,
+                            : entry.key.contains('address')
+                                ? TextInputType.multiline
+                                : TextInputType.text,
+                        minLines: entry.key.contains('address') ? 3 : 1,
+                        maxLines: entry.key.contains('address') ? 5 : 1,
+                        textInputAction: entry.key.contains('address')
+                            ? TextInputAction.newline
+                            : TextInputAction.next,
+                        textCapitalization: entry.key.contains('phone')
+                            ? TextCapitalization.none
+                            : entry.key == 'guarantor_name'
+                                ? TextCapitalization.words
+                                : TextCapitalization.sentences,
+                        autocorrect: !entry.key.contains('phone'),
                         validator: (value) {
                           final text = value?.trim() ?? '';
                           if (text.isEmpty) return 'This field is required.';
