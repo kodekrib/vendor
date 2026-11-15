@@ -16,7 +16,10 @@ import 'vendors_tab.dart';
 /// Root shell for the onboarding officer. Bottom navigation with six tabs:
 /// Dashboard, Vendors, Riders, Movers, Earnings, Account.
 class OnboarderHome extends StatefulWidget {
-  const OnboarderHome({super.key});
+  const OnboarderHome({super.key, this.session, this.connect});
+
+  final OnboarderSession? session;
+  final Future<void> Function(String token)? connect;
 
   @override
   State<OnboarderHome> createState() => _OnboarderHomeState();
@@ -27,6 +30,10 @@ class _OnboarderHomeState extends State<OnboarderHome> {
   bool _checking = true;
   bool _submitted = false;
   String? _error;
+  OnboarderSession get _session => widget.session ?? OnboarderSession.instance;
+
+  Future<void> _connect(String token) =>
+      (widget.connect ?? OnboardService.instance.connect)(token);
 
   @override
   void initState() {
@@ -40,8 +47,13 @@ class _OnboarderHomeState extends State<OnboarderHome> {
       _error = null;
     });
     try {
-      final token = OnboarderSession.instance.accessToken;
+      final token = _session.accessToken;
       if (token == null) throw const ApiException('Sign in to continue.');
+      if (_session.user?.role == 'admin') {
+        await _connect(token);
+        if (mounted) setState(() => _submitted = true);
+        return;
+      }
       final data = await ApiClient().get('/api/v1/onboarder/profile',
           headers: {'Authorization': 'Bearer $token'});
       final verification = await ApiClient().get('/api/v1/verification/status',
@@ -50,7 +62,7 @@ class _OnboarderHomeState extends State<OnboarderHome> {
       final submitted = data['profile']['kyc'] is Map &&
           checks
               .every((c) => c['required'] != true || c['status'] == 'verified');
-      if (submitted) await OnboardService.instance.connect(token);
+      if (submitted) await _connect(token);
       if (mounted) setState(() => _submitted = submitted);
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
@@ -82,7 +94,7 @@ class _OnboarderHomeState extends State<OnboarderHome> {
         TextButton(onPressed: _checkVerification, child: const Text('Retry')),
         TextButton(
             onPressed: () async {
-              await OnboarderSession.instance.logOut();
+              await _session.logOut();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute<void>(builder: (_) => const LoginScreen()),

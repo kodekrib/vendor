@@ -183,26 +183,6 @@ class AccountTab extends StatelessWidget {
                       'Bank account your commission is paid into.',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
-                          builder: (_) => InfoScreen(
-                            title: 'Payout account',
-                            icon: Icons.payments_outlined,
-                            description:
-                                'Where your commission lands each cycle.',
-                            bullets: [
-                              'A Nigerian naira account is required.',
-                              'Payouts run every Friday.',
-                              'Minimum payout: ${OnboarderApp.currencySymbol}2,000.',
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    _MenuEntry(
-                      Icons.account_balance_rounded,
-                      'Bank Accounts',
-                      'Manage your bank details for withdrawals',
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
                           builder: (_) => const BankAccountScreen(),
                         ),
                       ),

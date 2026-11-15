@@ -178,7 +178,7 @@ class _QuickActions extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('Quick actions', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
@@ -214,6 +214,7 @@ class _QuickActions extends StatelessWidget {
             icon: Icons.local_shipping_rounded,
             color: const Color(0xFFEA580C),
             label: 'Onboard mover',
+            illustration: 'assets/illustrations/onboard-mover-doodle.png',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                   builder: (_) => const OnboardMoverScreen()),
@@ -268,12 +269,14 @@ class _QuickActionTile extends StatelessWidget {
     required this.color,
     required this.label,
     required this.onTap,
+    this.illustration,
   });
 
   final IconData icon;
   final Color color;
   final String label;
   final VoidCallback onTap;
+  final String? illustration;
 
   @override
   Widget build(BuildContext context) {
@@ -283,27 +286,46 @@ class _QuickActionTile extends StatelessWidget {
       color: Skeuo.shade(color, 0.90),
       onTap: onTap,
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Skeuo.shade(color, 0.30), Skeuo.shade(color, -0.12)],
+          Expanded(
+              child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Skeuo.shade(color, 0.30),
+                      Skeuo.shade(color, -0.12)
+                    ],
+                  ),
+                  boxShadow: Skeuo.raisedShadows(depth: 0.35, tint: color),
+                ),
+                child: Icon(icon, color: Colors.white, size: 24),
               ),
-              boxShadow: Skeuo.raisedShadows(depth: 0.35, tint: color),
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-          const SizedBox(height: 12),
-          Text(label,
-              style:
-                  const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+              const SizedBox(height: 12),
+              Text(label,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 14)),
+            ],
+          )),
+          if (illustration != null) ...[
+            const SizedBox(width: 12),
+            Flexible(
+                child: ExcludeSemantics(
+                    child: Image.asset(
+              illustration!,
+              height: 96,
+              fit: BoxFit.contain,
+              cacheWidth: 480,
+            ))),
+          ],
         ],
       ),
     );

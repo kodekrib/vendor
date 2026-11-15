@@ -5,9 +5,19 @@ import 'package:vendor/app.dart';
 import 'package:vendor/screens/dashboard_tab.dart';
 import 'package:vendor/screens/home_screen.dart';
 import 'package:vendor/screens/onboard_mover_screen.dart';
+import 'package:vendor/screens/kyc_status_screen.dart';
+import 'package:vendor/services/auth_service.dart';
 import 'package:vendor/widgets/animated_3d.dart';
 import 'package:vendor/widgets/route_animation.dart';
 import 'package:vendor/widgets/skeuo.dart';
+
+class AdminSession extends OnboarderSession {
+  @override
+  String? get accessToken => 'admin-token';
+  @override
+  AuthUser? get user => const AuthUser(
+      id: '7', email: 'admin@example.test', name: 'Admin', role: 'admin');
+}
 
 void main() {
   setUpAll(() {
@@ -32,6 +42,26 @@ void main() {
     expect(find.text('Sign in to continue.'), findsOneWidget);
     expect(find.text('Quick actions'), findsNothing);
     expect(find.byType(NavigationBar), findsNothing);
+  });
+
+  testWidgets('admin opens dashboard without KYC or provider checks',
+      (tester) async {
+    final session = AdminSession();
+    String? connectedToken;
+    await tester.pumpWidget(MaterialApp(
+        home: OnboarderHome(
+      session: session,
+      connect: (token) async {
+        connectedToken = token;
+      },
+    )));
+    await tester.pump();
+    expect(connectedToken, 'admin-token');
+    expect(find.byType(KYCStatusScreen), findsNothing);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.text('Quick actions'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    session.dispose();
   });
 
   testWidgets('dashboard mover CTA opens mover onboarding', (tester) async {

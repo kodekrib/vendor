@@ -217,7 +217,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen> {
                       SizedBox(width: 8),
                       Expanded(
                           child: Text(
-                              'Add a bank account first in Account > Bank Accounts.')),
+                              'Add a bank account first in Account > Payout account.')),
                     ],
                   ),
                   TextButton(
