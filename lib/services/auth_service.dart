@@ -285,9 +285,11 @@ class OnboarderSession extends ChangeNotifier {
 
   Future<void> _completeSession(TokenPair tokens) async {
     final user = await service.me(tokens.accessToken);
-    if (user.role != 'onboarder' && user.role != 'vendor') {
+    if (user.role != 'onboarder' &&
+        user.role != 'vendor' &&
+        user.role != 'admin') {
       throw const ApiException(
-          'Sign in with a vendor or field onboarder account.');
+          'Sign in with a vendor, field onboarder or admin account.');
     }
     _accessToken = tokens.accessToken;
     _refreshToken = tokens.refreshToken;

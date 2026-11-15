@@ -43,9 +43,17 @@ void main() {
     await expectLater(
         session.signIn('customer@example.test', 'password'),
         throwsA(isA<ApiException>().having((e) => e.message, 'message',
-            contains('vendor or field onboarder'))));
+            contains('vendor, field onboarder or admin'))));
     expect(session.isAuthenticated, isFalse);
     expect(session.accessToken, isNull);
+    session.dispose();
+  });
+
+  test('admin can sign in without changing their role', () async {
+    final session = OnboarderSession(service: LoginService(role: 'admin'));
+    expect(await session.signIn('admin@example.test', 'password'), isTrue);
+    expect(session.user?.role, 'admin');
+    expect(session.accessToken, 'access');
     session.dispose();
   });
 
